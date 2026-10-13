@@ -19,6 +19,8 @@ if ($query) {
         $m['protocols'] = getMirrorProtocols($pdo, $m['id']);
     }
     unset($m);
+    // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
+    $monitorStatuses = monitorStatusMap($pdo, array_column($results, 'id'));
 }
 
 renderHeader('جستجو');
@@ -52,12 +54,16 @@ renderHeader('جستجو');
                                 <span class="mirror-name-en"><?= htmlspecialchars($names['en']) ?></span>
                             <?php endif; ?>
                         </div>
-                        <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                        <div class="mirror-actions">
+                            <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                            <?= pingButton($mirror['url']) ?>
+                        </div>
                     </div>
                     <?php if ($mirror['description']): ?>
                         <p class="mirror-desc"><?= htmlspecialchars($mirror['description']) ?></p>
                     <?php endif; ?>
                     <div class="mirror-meta">
+                        <?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?>
                         <?= protocolBadges($mirror['protocols'] ?? getMirrorProtocols($pdo, $mirror['id'])) ?>
                         <?php foreach ($mirror['categories'] as $c): ?>
                             <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($c['slug']) ?>" class="badge badge-primary"><?= htmlspecialchars($c['name']) ?></a>

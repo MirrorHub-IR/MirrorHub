@@ -19,6 +19,19 @@ function sanitize($data) {
 }
 
 /* ============================================================
+   Asset URL
+   نسخه‌بندی خودکار بر اساس زمان تغییر فایل تا مرورگر بعد از هر
+   به‌روزرسانی، CSS/JS/لوگوی تازه را بگیرد و کش قدیمی نماند.
+   ============================================================ */
+function asset($path) {
+    $path = ltrim((string)$path, '/');
+    $file = dirname(__DIR__) . '/assets/' . $path;
+    $version = @filemtime($file);
+
+    return SITE_URL . '/assets/' . $path . ($version ? '?v=' . $version : '');
+}
+
+/* ============================================================
    CSRF
    ============================================================ */
 function generateCsrfToken() {
@@ -221,19 +234,47 @@ function protocolBadges(array $protocols) {
 /* ============================================================
    Categories
    ============================================================ */
-function getCategories($pdo, $parentId = null) {
+function getCategoryTypes() {
+    return [
+        'software' => 'نرم‌افزار',
+        'provider' => 'ارائه‌دهنده',
+    ];
+}
+
+function getCategoryTypeLabel($type) {
+    $types = getCategoryTypes();
+    return $types[$type] ?? 'نامشخص';
+}
+
+function getCategories($pdo, $parentId = null, $type = null) {
     if ($parentId === null) {
-        $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY sort_order ASC, name ASC");
-        $stmt->execute();
+        if ($type !== null) {
+            $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id IS NULL AND type = ? ORDER BY sort_order ASC, name ASC");
+            $stmt->execute([$type]);
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY sort_order ASC, name ASC");
+            $stmt->execute();
+        }
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id = ? ORDER BY sort_order ASC, name ASC");
-        $stmt->execute([(int)$parentId]);
+        if ($type !== null) {
+            $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id = ? AND type = ? ORDER BY sort_order ASC, name ASC");
+            $stmt->execute([(int)$parentId, $type]);
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM categories WHERE parent_id = ? ORDER BY sort_order ASC, name ASC");
+            $stmt->execute([(int)$parentId]);
+        }
     }
     return $stmt->fetchAll();
 }
 
+function getCategoriesByType($pdo, $type) {
+    $stmt = $pdo->prepare("SELECT * FROM categories WHERE type = ? ORDER BY sort_order ASC, name ASC");
+    $stmt->execute([$type]);
+    return $stmt->fetchAll();
+}
+
 function getAllCategories($pdo) {
-    return $pdo->query("SELECT * FROM categories ORDER BY sort_order ASC, name ASC")->fetchAll();
+    return $pdo->query("SELECT * FROM categories ORDER BY FIELD(type, 'software', 'provider'), sort_order ASC, name ASC")->fetchAll();
 }
 
 function getCategoryPath($pdo, $categoryId) {
@@ -262,6 +303,65 @@ function getCategoryById($pdo, $id) {
     $stmt = $pdo->prepare("SELECT * FROM categories WHERE id = ?");
     $stmt->execute([(int)$id]);
     return $stmt->fetch() ?: null;
+}
+
+function uploadCategoryIcon($file, $oldIcon = null) {
+    $uploadDir = __DIR__ . '/../uploads/category-icons/';
+    
+    // Create directory if it doesn't exist
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    
+    // Validate file
+    if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        return ['success' => false, 'error' => 'فایلی آپلود نشده است.'];
+    }
+    
+    // Check file size (max 500KB)
+    if ($file['size'] > 500 * 1024) {
+        return ['success' => false, 'error' => 'حجم فایل نباید بیشتر از ۵۰۰ کیلوبایت باشد.'];
+    }
+    
+    // Check file type
+    $allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    if (!in_array($mimeType, $allowedTypes)) {
+        return ['success' => false, 'error' => 'فرمت فایل معتبر نیست. فقط PNG, JPG و SVG مجاز است.'];
+    }
+    
+    // Generate unique filename
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = uniqid('cat_icon_', true) . '.' . strtolower($extension);
+    $filepath = $uploadDir . $filename;
+    
+    // Move uploaded file
+    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+        return ['success' => false, 'error' => 'خطا در ذخیره فایل.'];
+    }
+    
+    // Delete old icon if exists
+    if ($oldIcon && file_exists($uploadDir . basename($oldIcon))) {
+        @unlink($uploadDir . basename($oldIcon));
+    }
+    
+    return ['success' => true, 'filename' => $filename];
+}
+
+function deleteCategoryIcon($icon) {
+    if (empty($icon)) return false;
+    
+    $uploadDir = __DIR__ . '/../uploads/category-icons/';
+    $filepath = $uploadDir . basename($icon);
+    
+    if (file_exists($filepath)) {
+        return @unlink($filepath);
+    }
+    
+    return false;
 }
 
 /* ============================================================
@@ -423,6 +523,42 @@ function mirrorDisplayName(array $mirror) {
         return ['fa' => $fa, 'en' => $en];
     }
     return ['fa' => $fa ?: $en, 'en' => $en ?: $fa];
+}
+
+/* ============================================================
+   Client-side Ping
+   (زمان پاسخ از سمت مرورگر کاربر اندازه‌گیری می‌شود، نه از سمت سرور)
+   ============================================================ */
+
+/**
+ * پروتکل‌هایی که مرورگر می‌تواند زمان پاسخ آن‌ها را اندازه بگیرد.
+ * مرورگر فقط http/https را می‌تواند درخواست کند؛ ftp/rsync/magnet و... قابل پینگ نیستند.
+ */
+function isPingableUrl($url) {
+    $url = trim((string)$url);
+    if ($url === '') return false;
+    $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+    return in_array($scheme, ['http', 'https'], true);
+}
+
+/**
+ * دکمه پینگ کارت‌ها. آدرس دقیق همان لینکی است که کارت به آن اشاره دارد
+ * و اندازه‌گیری کاملاً در مرورگر کاربر (JavaScript) انجام می‌شود.
+ * نتیجه (یک عدد ms) روی همین دکمه و رنگی نمایش داده می‌شود.
+ * اگر لینک قابل اندازه‌گیری نباشد (پروتکل غیر http/https)، دکمه‌ای ساخته نمی‌شود.
+ */
+function pingButton($url, $class = '') {
+    $url = trim((string)$url);
+    if (!isPingableUrl($url)) return '';
+
+    $classes = trim('btn btn-sm btn-outline ping-btn ' . $class);
+
+    return '<button type="button" class="' . htmlspecialchars($classes) . '"'
+        . ' data-ping-url="' . htmlspecialchars($url) . '"'
+        . ' title="اندازه‌گیری زمان پاسخ این لینک از مرورگر شما (پینگ سمت کاربر)">'
+        . icon('activity', 14)
+        . '<span class="ping-btn-text">پینگ</span>'
+        . '</button>';
 }
 
 /* ============================================================

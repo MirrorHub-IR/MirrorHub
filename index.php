@@ -3,11 +3,23 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/layout.php';
 
-$stmt = $pdo->query("SELECT c.*, p.name AS parent_name, p.slug AS parent_slug
+// Get software categories
+$softwareCategories = $pdo->query(
+    "SELECT c.*, p.name AS parent_name, p.slug AS parent_slug
     FROM categories c
-    INNER JOIN categories p ON p.id = c.parent_id
-    ORDER BY p.sort_order ASC, p.name ASC, c.sort_order ASC, c.name ASC");
-$topCategories = $stmt->fetchAll();
+    LEFT JOIN categories p ON p.id = c.parent_id
+    WHERE c.type = 'software'
+    ORDER BY c.parent_id IS NULL DESC, c.sort_order ASC, c.name ASC"
+)->fetchAll();
+
+// Get provider categories
+$providerCategories = $pdo->query(
+    "SELECT c.*, p.name AS parent_name, p.slug AS parent_slug
+    FROM categories c
+    LEFT JOIN categories p ON p.id = c.parent_id
+    WHERE c.type = 'provider'
+    ORDER BY c.parent_id IS NULL DESC, c.sort_order ASC, c.name ASC"
+)->fetchAll();
 
 $stmt = $pdo->query("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT 12");
 $recentMirrors = $stmt->fetchAll();
@@ -16,6 +28,9 @@ foreach ($recentMirrors as &$mirror) {
     $mirror['protocols'] = getMirrorProtocols($pdo, $mirror['id']);
 }
 unset($mirror);
+
+// وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
+$monitorStatuses = monitorStatusMap($pdo, array_column($recentMirrors, 'id'));
 
 renderHeader('خانه');
 ?>
@@ -29,27 +44,65 @@ renderHeader('خانه');
     </form>
 </section>
 
+<?php if (!empty($softwareCategories)): ?>
 <section class="section">
     <div class="section-header">
-        <h2 class="section-title">دسته‌بندی‌ها</h2>
-        <span class="badge badge-primary"><?= count($topCategories) ?> زیر‌دسته</span>
+        <h2 class="section-title">نرم‌افزارها</h2>
+        <span class="badge badge-primary"><?= count($softwareCategories) ?> دسته‌بندی</span>
     </div>
     <div class="grid grid-cols-3">
-        <?php if (empty($topCategories)): ?>
-            <p class="empty-state">هنوز دسته‌بندی‌ای ایجاد نشده است.</p>
-        <?php else: ?>
-            <?php foreach ($topCategories as $cat): ?>
-                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="card category-card">
-                    <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
+        <?php foreach ($softwareCategories as $cat): ?>
+            <div class="card category-card">
+                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
+                    <?php if (!empty($cat['icon'])): ?>
+                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">
+                    <?php endif; ?>
+                    <?php if ($cat['parent_name']): ?>
+                        <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
+                    <?php endif; ?>
                     <h3><?= htmlspecialchars($cat['name']) ?></h3>
                     <?php if ($cat['description']): ?>
                         <p><?= htmlspecialchars(excerpt($cat['description'], 80)) ?></p>
                     <?php endif; ?>
                 </a>
-            <?php endforeach; ?>
-        <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
     </div>
 </section>
+<?php endif; ?>
+
+<?php if (!empty($providerCategories)): ?>
+<section class="section">
+    <div class="section-header">
+        <h2 class="section-title">ارائه‌دهندگان</h2>
+        <span class="badge badge-primary"><?= count($providerCategories) ?> دسته‌بندی</span>
+    </div>
+    <div class="grid grid-cols-3">
+        <?php foreach ($providerCategories as $cat): ?>
+            <div class="card category-card">
+                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
+                    <?php if (!empty($cat['icon'])): ?>
+                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">
+                    <?php endif; ?>
+                    <?php if ($cat['parent_name']): ?>
+                        <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
+                    <?php endif; ?>
+                    <h3><?= htmlspecialchars($cat['name']) ?></h3>
+                    <?php if ($cat['description']): ?>
+                        <p><?= htmlspecialchars(excerpt($cat['description'], 80)) ?></p>
+                    <?php endif; ?>
+                </a>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endif; ?>
+
+<?php if (empty($softwareCategories) && empty($providerCategories)): ?>
+<section class="section">
+    <p class="empty-state">هنوز دسته‌بندی‌ای ایجاد نشده است.</p>
+</section>
+<?php endif; ?>
 
 <?php if (!empty($recentMirrors)): ?>
 <section class="section">
@@ -68,12 +121,16 @@ renderHeader('خانه');
                             <span class="mirror-name-en"><?= htmlspecialchars($names['en']) ?></span>
                         <?php endif; ?>
                     </div>
-                    <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                    <div class="mirror-actions">
+                        <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                        <?= pingButton($mirror['url']) ?>
+                    </div>
                 </div>
                 <?php if ($mirror['description']): ?>
                     <p class="mirror-desc"><?= htmlspecialchars(excerpt($mirror['description'], 120)) ?></p>
                 <?php endif; ?>
                 <div class="mirror-meta">
+                    <?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?>
                     <?= protocolBadges($mirror['protocols'] ?? getMirrorProtocols($pdo, $mirror['id'])) ?>
                     <?php foreach ($mirror['categories'] as $c): ?>
                         <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($c['slug']) ?>" class="badge badge-primary"><?= htmlspecialchars($c['name']) ?></a>

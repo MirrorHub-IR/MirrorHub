@@ -85,6 +85,7 @@ foreach ($mirrors as &$m) {
     $m['categories'] = getMirrorCategories($pdo, $m['id']);
 }
 unset($m);
+$monitorStatuses = monitorStatusMap($pdo, array_column($mirrors, 'id'));
 
 $categories = getAllCategories($pdo);
 $currentMirror = null;
@@ -327,10 +328,22 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                                                 $parentNames[(int)$cat['id']] = $cat['name'];
                                             }
                                         }
-                                        foreach ($categories as $cat):
-                                            $catId = (int)$cat['id'];
-                                            $isSelected = in_array($catId, $currentCatIds, true);
-                                            $parentLabel = !empty($cat['parent_id']) ? ($parentNames[(int)$cat['parent_id']] ?? 'دسته‌بندی') : null;
+                                        // Group categories by type for display
+                                        $catsByType = ['software' => [], 'provider' => []];
+                                        foreach ($categories as $cat) {
+                                            $t = $cat['type'] ?? 'software';
+                                            $catsByType[$t][] = $cat;
+                                        }
+                                        $typeLabels = ['software' => 'نرم‌افزارها', 'provider' => 'ارائه‌دهندگان'];
+                                        foreach ($catsByType as $typeKey => $typeCats):
+                                            if (empty($typeCats)) continue;
+                                        ?>
+                                            <div class="mirror-category-group-label"><?= $typeLabels[$typeKey] ?></div>
+                                        <?php
+                                            foreach ($typeCats as $cat):
+                                                $catId = (int)$cat['id'];
+                                                $isSelected = in_array($catId, $currentCatIds, true);
+                                                $parentLabel = !empty($cat['parent_id']) ? ($parentNames[(int)$cat['parent_id']] ?? 'دسته‌بندی') : null;
                                         ?>
                                             <label class="mirror-category-card<?= $isSelected ? ' is-selected' : '' ?>">
                                                 <input type="checkbox" name="category_ids[]" value="<?= $catId ?>" <?= $isSelected ? 'checked' : '' ?>>
@@ -338,10 +351,14 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                                 <span class="mirror-category-copy">
+                                                    <?php if (!empty($cat['icon'])): ?>
+                                                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-left:4px;">
+                                                    <?php endif; ?>
                                                     <strong><?= htmlspecialchars($cat['name']) ?></strong>
                                                     <?php if ($parentLabel): ?><small><?= htmlspecialchars($parentLabel) ?></small><?php else: ?><small>دسته‌بندی اصلی</small><?php endif; ?>
                                                 </span>
                                             </label>
+                                        <?php endforeach; ?>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
                                 </div>
@@ -481,7 +498,9 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                                         <?php endforeach; ?>
                                     <?php endif; ?>
                                 </td>
-                                <td data-label="وضعیت"><span class="badge badge-<?= $mirror['status'] === 'active' ? 'success' : 'warning' ?>"><?= $mirror['status'] === 'active' ? 'فعال' : 'غیرفعال' ?></span></td>
+                                <td data-label="وضعیت"><span class="badge badge-<?= $mirror['status'] === 'active' ? 'success' : 'warning' ?>"><?= $mirror['status'] === 'active' ? 'فعال' : 'غیرفعال' ?></span>
+                                    <?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?>
+                                </td>
                                 <td data-label="عملیات" class="actions">
                                     <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">مشاهده</a>
                                     <a href="?action=edit&id=<?= $mirror['id'] ?>" class="btn btn-sm btn-outline">ویرایش</a>

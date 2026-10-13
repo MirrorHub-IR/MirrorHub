@@ -21,13 +21,22 @@ function renderHeader($title = '', $isAdmin = false) {
     <meta name="description" content="<?= htmlspecialchars($siteName) ?> - مخزن میرورهای نرم‌افزاری">
     <meta name="theme-color" content="#0e1410">
     <title><?= htmlspecialchars($pageTitle) ?></title>
-    <link rel="stylesheet" href="<?= SITE_URL ?>/assets/css/style.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23a3d65c'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="<?= asset('css/style.css') ?>">
+    <link rel="icon" type="image/png" href="<?= asset('logo.png') ?>">
+    <link rel="shortcut icon" type="image/png" href="<?= asset('logo.png') ?>">
+    <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="<?= htmlspecialchars($siteName) ?>">
+    <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?>">
+    <meta property="og:image" content="<?= SITE_URL ?>/assets/logo.png">
 </head>
 <body class="<?= $isAdmin ? 'admin-layout' : 'public-layout' ?>">
     <header class="main-header">
         <div class="container">
-            <a href="<?= SITE_URL ?>/<?= $isAdmin ? 'admin/dashboard.php' : 'index.php' ?>" class="logo"><?= htmlspecialchars($siteName) ?></a>
+            <a href="<?= SITE_URL ?>/<?= $isAdmin ? 'admin/dashboard.php' : 'index.php' ?>" class="logo">
+                <img src="<?= asset('logo.png') ?>" alt="<?= htmlspecialchars($siteName) ?>" class="logo-mark" width="34" height="34">
+                <span class="logo-text"><?= htmlspecialchars($siteName) ?></span>
+            </a>
             <button type="button"
                     class="nav-toggle"
                     aria-label="باز کردن منو"
@@ -45,6 +54,9 @@ function renderHeader($title = '', $isAdmin = false) {
                     </a>
                     <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>">
                         <?= icon('server', 15) ?><span>میرورها</span>
+                    </a>
+                    <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>">
+                        <?= icon('activity', 15) ?><span>پایش سرورها</span>
                     </a>
                     <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>">
                         <?= icon('inbox', 15) ?><span>درخواست‌ها</span>
@@ -64,6 +76,9 @@ function renderHeader($title = '', $isAdmin = false) {
                     </a>
                     <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>">
                         <?= icon('search', 15) ?><span>جستجو</span>
+                    </a>
+                    <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>">
+                        <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
                     </a>
                     <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>">
                         <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
@@ -89,13 +104,21 @@ function renderFooter() {
 
     <footer class="main-footer">
         <div class="container">
+            <div class="footer-brand">
+                <img src="<?= asset('logo.png') ?>" alt="" class="footer-logo" width="34" height="34" loading="lazy">
+                <div class="footer-brand-text">
+                    <span class="footer-brand-name"><?= htmlspecialchars(SITE_NAME) ?></span>
+                    <span class="footer-tagline">مخزن میرورهای نرم‌افزاری</span>
+                </div>
+            </div>
             <p class="footer-copy">&copy; <?= date('Y') ?> <?= htmlspecialchars(SITE_NAME) ?>. تمامی حقوق محفوظ است.</p>
             <p class="footer-made">ساخته شده با <span class="heart"><?= icon('heart', 14) ?></span> در ایران</p>
         </div>
     </footer>
 
     <script>window.MH_SITE_URL = <?= json_encode(SITE_URL) ?>;</script>
-    <script src="<?= SITE_URL ?>/assets/js/app.js"></script>
+    <script src="<?= asset('js/app.js') ?>"></script>
+    <script src="<?= asset('js/ping.js') ?>"></script>
 </body>
 </html>
 <?php

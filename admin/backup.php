@@ -46,7 +46,7 @@ function findByValue(PDO $pdo, string $table, string $column, $value): ?int {
 
 function fetchBackupRows(array $backup, string $table): array {
     if (!isset($backup['tables'][$table]['rows']) || !is_array($backup['tables'][$table]['rows'])) {
-        throw new RuntimeException("ساختار جدول «$table» در فایل پشتیبان نامعتبر است.");
+        throw new RuntimeException("ساختار جدول «{$table}» در فایل پشتیبان نامعتبر است.");
     }
     return $backup['tables'][$table]['rows'];
 }
@@ -54,7 +54,7 @@ function fetchBackupRows(array $backup, string $table): array {
 function mappedId(array $map, $oldId, string $label): ?int {
     if ($oldId === null || $oldId === '' || (int)$oldId === 0) return null;
     $oldId = (int)$oldId;
-    if (!isset($map[$oldId])) throw new RuntimeException("ارتباط «$label» در فایل پشتیبان قابل بازیابی نیست.");
+    if (!isset($map[$oldId])) throw new RuntimeException("ارتباط «{$label}» در فایل پشتیبان قابل بازیابی نیست.");
     return (int)$map[$oldId];
 }
 
@@ -128,9 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         $availableTables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         $columnMap = [];
         foreach ($backupTables as $table) {
-            if (!in_array($table, $availableTables, true)) throw new RuntimeException("جدول «$table» در پایگاه داده فعلی موجود نیست.");
+            if (!in_array($table, $availableTables, true)) throw new RuntimeException("جدول «{$table}» در پایگاه داده فعلی موجود نیست.");
             if (!isset($backup['tables'][$table]) || !is_array($backup['tables'][$table]['rows'] ?? null)) {
-                throw new RuntimeException("فایل پشتیبان ناقص یا نامعتبر است: «$table».");
+                throw new RuntimeException("فایل پشتیبان ناقص یا نامعتبر است: «{$table}».");
             }
             $columnMap[$table] = tableColumns($pdo, $table);
         }

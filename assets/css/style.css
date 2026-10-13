@@ -119,21 +119,19 @@ a:hover { color: var(--accent-hover); }
     transition: color var(--t);
 }
 
-.logo::before {
-    content: '';
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-soft);
-    transition: box-shadow var(--t), transform var(--t);
+.logo-mark {
+    display: block;
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    transition: transform var(--t);
 }
 
+.logo-text { line-height: 1.15; }
+
 .logo:hover { color: var(--accent); }
-.logo:hover::before {
-    transform: scale(1.15);
-    box-shadow: 0 0 0 6px var(--accent-glow);
+.logo:hover .logo-mark {
+    transform: scale(1.05);
 }
 
 .main-nav {
@@ -243,6 +241,11 @@ a:hover { color: var(--accent-hover); }
     .logo {
         font-size: 1.15rem;
     }
+
+    .logo-mark {
+        width: 30px;
+        height: 30px;
+    }
 }
 
 .main-nav a {
@@ -325,6 +328,38 @@ a:hover { color: var(--accent-hover); }
     padding: 1.5rem 0;
     text-align: center;
     margin-top: auto;
+}
+
+.footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+    text-align: right;
+}
+
+.footer-logo {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+.footer-brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.35;
+}
+
+.footer-brand-name {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 0.98rem;
+}
+
+.footer-tagline {
+    color: var(--text-muted);
+    font-size: 0.76rem;
 }
 
 .footer-copy {
@@ -3301,4 +3336,411 @@ a.badge:hover { color: var(--accent); border-color: var(--accent); background: v
         width: 34px;
         height: 34px;
     }
+}
+
+/* ============================================================
+   Category Type & Icon Styles
+   ============================================================ */
+
+.category-card-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    object-fit: contain;
+    opacity: 0.9;
+    transition: opacity var(--t);
+}
+
+.category-card:hover .category-card-icon {
+    opacity: 1;
+}
+
+.category-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.category-type-software {
+    background: rgba(163, 214, 92, 0.2);
+    color: #bde87a;
+    border: 1px solid rgba(163, 214, 92, 0.3);
+}
+
+.category-type-provider {
+    background: rgba(107, 182, 217, 0.2);
+    color: #7ec5e6;
+    border: 1px solid rgba(107, 182, 217, 0.3);
+}
+
+.icon-upload-preview {
+    max-width: 120px;
+    max-height: 120px;
+    margin-top: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    object-fit: contain;
+    display: block;
+}
+
+/* Form hint styling */
+.form-hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+/* Category list table icon styling */
+table td img {
+    vertical-align: middle;
+}
+
+/* Section spacing for multiple category types */
+.section + .section {
+    margin-top: 2rem;
+}
+
+/* Category group label in mirror editor */
+.mirror-category-group-label {
+    grid-column: 1 / -1;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 0.5rem 0 0.25rem;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 0.25rem;
+}
+
+/* ============ Login / auth logo ============ */
+.auth-logo-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.auth-logo {
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0;
+    object-fit: contain;
+}
+
+@media (max-width: 768px) {
+    .auth-logo {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* ============================================================
+   Client-side ping (زمان پاسخ از مرورگر کاربر)
+   ============================================================ */
+.mirror-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+}
+
+.ping-btn {
+    min-width: 4.9rem;
+    justify-content: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ping-btn svg {
+    flex: 0 0 auto;
+}
+
+.ping-btn.is-busy {
+    cursor: progress;
+    opacity: 0.92;
+}
+
+.ping-btn.is-busy svg {
+    animation: pingPulse 0.9s ease-in-out infinite;
+}
+
+@keyframes pingPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+.ping-btn.ping-excellent {
+    color: var(--success);
+    border-color: rgba(141, 211, 95, 0.5);
+    background: rgba(141, 211, 95, 0.12);
+}
+.ping-btn.ping-good {
+    color: var(--accent);
+    border-color: rgba(163, 214, 92, 0.45);
+    background: var(--accent-soft);
+}
+.ping-btn.ping-fair {
+    color: var(--warning);
+    border-color: rgba(224, 179, 86, 0.5);
+    background: rgba(224, 179, 86, 0.12);
+}
+.ping-btn.ping-slow {
+    color: var(--danger);
+    border-color: rgba(236, 107, 107, 0.5);
+    background: rgba(236, 107, 107, 0.12);
+}
+.ping-btn.ping-fail {
+    color: var(--danger);
+    border-color: rgba(236, 107, 107, 0.55);
+    background: rgba(236, 107, 107, 0.14);
+    border-style: dashed;
+}
+.ping-btn.ping-na {
+    color: var(--text-muted);
+    border-style: dashed;
+}
+
+/* Category cards: whole-card link overlay
+   (دسته‌بندی‌ها پینگ ندارند؛ فقط کل کارت لینک است) */
+.category-card-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.category-card-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: 1;
+}
+
+.category-card::after {
+    pointer-events: none;
+}
+
+@media (max-width: 560px) {
+    .mirror-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .mirror-actions {
+        justify-content: flex-start;
+        margin-top: 0.35rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ping-btn.is-busy svg {
+        animation: none;
+        opacity: 0.7;
+    }
+}
+
+/* ============================================================
+   سامانهٔ پایش میرورها (Monitoring UI)
+   ============================================================ */
+
+/* --- بنر وضعیت کلی --- */
+.mon-hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+.mon-hero h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.15rem; }
+.mon-hero p { font-size: 0.82rem; color: var(--text-secondary); }
+.mon-hero-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
+    animation: mon-pulse 2.2s infinite;
+}
+.mon-hero-up { border-color: rgba(141, 211, 95, 0.4); background: rgba(141, 211, 95, 0.06); }
+.mon-hero-up .mon-hero-dot { background: var(--success); box-shadow: 0 0 0 0 rgba(141, 211, 95, 0.5); }
+.mon-hero-up h2 { color: var(--success); }
+.mon-hero-slow { border-color: rgba(224, 179, 86, 0.4); background: rgba(224, 179, 86, 0.06); }
+.mon-hero-slow .mon-hero-dot { background: var(--warning); box-shadow: 0 0 0 0 rgba(224, 179, 86, 0.5); }
+.mon-hero-slow h2 { color: var(--warning); }
+.mon-hero-down { border-color: rgba(236, 107, 107, 0.45); background: rgba(236, 107, 107, 0.07); }
+.mon-hero-down .mon-hero-dot { background: var(--danger); box-shadow: 0 0 0 0 rgba(236, 107, 107, 0.5); }
+.mon-hero-down h2 { color: var(--danger); }
+.mon-hero-unknown .mon-hero-dot { background: var(--text-muted); animation: none; }
+
+@keyframes mon-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(141, 211, 95, 0.45); }
+    70% { box-shadow: 0 0 0 10px rgba(141, 211, 95, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(141, 211, 95, 0); }
+}
+
+/* --- نشان وضعیت (badge) --- */
+.mon-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.22rem 0.65rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.76rem;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.mon-badge .mon-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+}
+.mon-badge .mon-ms { font-size: 0.7rem; opacity: 0.85; direction: ltr; }
+.mon-badge.mon-up { color: var(--success); border-color: rgba(141, 211, 95, 0.35); background: rgba(141, 211, 95, 0.08); }
+.mon-badge.mon-up .mon-dot { background: var(--success); animation: mon-pulse 2.4s infinite; }
+.mon-badge.mon-slow { color: var(--warning); border-color: rgba(224, 179, 86, 0.35); background: rgba(224, 179, 86, 0.08); }
+.mon-badge.mon-slow .mon-dot { background: var(--warning); }
+.mon-badge.mon-down { color: var(--danger); border-color: rgba(236, 107, 107, 0.4); background: rgba(236, 107, 107, 0.08); }
+.mon-badge.mon-down .mon-dot { background: var(--danger); animation: mon-pulse 1.4s infinite; }
+.mon-badge.mon-unknown { color: var(--text-muted); }
+.mon-badge.mon-sm { font-size: 0.7rem; padding: 0.12rem 0.5rem; }
+
+/* --- آیکون کارت‌های آمار --- */
+.mon-icon-up { background: rgba(141, 211, 95, 0.12); color: var(--success); }
+.mon-icon-slow { background: rgba(224, 179, 86, 0.12); color: var(--warning); }
+.mon-icon-down { background: rgba(236, 107, 107, 0.12); color: var(--danger); }
+
+/* --- نوار آپتایم روزانه --- */
+.uptime-bar {
+    display: flex;
+    gap: 2px;
+    margin-top: 0.4rem;
+    direction: ltr;
+    max-width: 260px;
+}
+.uptime-seg {
+    flex: 1;
+    height: 20px;
+    min-width: 3px;
+    border-radius: 2px;
+    background: var(--bg-elevated);
+    cursor: default;
+    transition: transform var(--t-fast), filter var(--t-fast);
+}
+.uptime-seg:hover { transform: scaleY(1.25); filter: brightness(1.3); }
+.uptime-seg.is-up { background: var(--success); }
+.uptime-seg.is-slow { background: var(--warning); }
+.uptime-seg.is-down { background: var(--danger); }
+.uptime-seg.is-none { background: var(--bg-elevated); opacity: 0.6; }
+.mon-uptime-num { font-weight: 700; font-size: 0.9rem; direction: ltr; text-align: right; }
+
+/* --- نمودار روند (sparkline) --- */
+.sparkline { color: var(--accent); opacity: 0.9; display: block; }
+.mon-no-data { color: var(--text-muted); font-size: 0.75rem; }
+
+/* --- جدول وضعیت --- */
+.mon-table-wrap { overflow-x: auto; }
+.mon-table .mon-url {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-top: 0.15rem;
+}
+.mon-table .mon-url:hover { color: var(--accent); text-decoration: underline; }
+.mon-name-en { display: block; font-size: 0.72rem; color: var(--text-muted); }
+.mon-since { font-size: 0.72rem; color: var(--danger); margin-top: 0.2rem; }
+.mon-ms-value { font-weight: 600; direction: ltr; display: inline-block; }
+.mon-ms-up { color: var(--success); }
+.mon-ms-slow { color: var(--warning); }
+.mon-last-check { color: var(--text-secondary); font-size: 0.8rem; white-space: nowrap; }
+.mon-cell-status { white-space: nowrap; }
+.mon-row-down td { background: rgba(236, 107, 107, 0.035); }
+.mon-error-row td { background: rgba(236, 107, 107, 0.05); border-top: none; }
+.mon-error-cell {
+    font-size: 0.75rem;
+    color: var(--danger);
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.5rem !important;
+}
+.mon-incident-note { font-size: 0.78rem; color: var(--text-secondary); max-width: 320px; white-space: normal; }
+.mon-warn-text { color: var(--warning); }
+
+/* --- جعبهٔ توضیح و زمان‌بندی --- */
+.mon-info-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.4rem;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    line-height: 2;
+}
+.mon-info-box h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    margin-bottom: 0.6rem;
+}
+.mon-info-box code {
+    display: inline-block;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--accent);
+    margin: 0.25rem 0;
+    direction: ltr;
+    unicode-bidi: embed;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.mon-cron-list { padding-right: 1.2rem; }
+.mon-cron-list li { margin-bottom: 0.7rem; }
+.mon-hint-line { margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
+.mon-key-box {
+    display: block;
+    user-select: all;
+}
+.mon-check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    cursor: pointer;
+    margin-bottom: 0.4rem;
+}
+.mon-check-label input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* --- موبایل --- */
+@media (max-width: 768px) {
+    .uptime-bar { max-width: 160px; }
+    .uptime-seg { height: 16px; }
+    .mon-hero { flex-direction: row; padding: 0.9rem 1rem; }
+    .mon-hero h2 { font-size: 0.95rem; }
+    .mon-incident-note { max-width: 180px; }
 }

@@ -48,6 +48,9 @@ renderHeader('ورود به مدیریت', true);
 
 <section class="auth-container">
     <div class="auth-box">
+        <div class="auth-logo-wrap">
+            <img src="<?= asset('logo.png') ?>" alt="<?= htmlspecialchars(SITE_NAME) ?>" class="auth-logo" width="72" height="72">
+        </div>
         <h1>ورود به پنل مدیریت</h1>
         <form action="<?= SITE_URL ?>/admin/login.php" method="POST" class="auth-form">
             <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">

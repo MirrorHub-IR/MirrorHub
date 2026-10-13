@@ -14,6 +14,9 @@ $stats = [
 
 $visits = getVisitStats($pdo);
 
+// خلاصهٔ سامانهٔ پایش سرورها
+$monitorSummary = monitorStatusSummary($pdo);
+
 $stmt = $pdo->query("SELECT * FROM requests WHERE status = 'pending' ORDER BY created_at DESC LIMIT 5");
 $recentRequests = $stmt->fetchAll();
 
@@ -44,6 +47,36 @@ renderHeader('داشبورد مدیریت', true);
             <span class="stat-icon"><?= icon('inbox', 20) ?></span>
             <h3><?= number_format($stats['pending_requests']) ?></h3>
             <p>درخواست‌های بررسی‌نشده</p>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-header">
+        <h2 class="section-title">وضعیت پایش سرورها</h2>
+        <a href="<?= SITE_URL ?>/admin/monitor.php" class="btn btn-sm btn-outline">مدیریت پایش</a>
+    </div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-icon mon-icon-up"><?= icon('check', 20) ?></span>
+            <h3><?= monitorFa($monitorSummary['up']) ?></h3>
+            <p>میرور آنلاین</p>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon mon-icon-slow"><?= icon('activity', 20) ?></span>
+            <h3><?= monitorFa($monitorSummary['slow']) ?></h3>
+            <p>میرور کند</p>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon mon-icon-down"><?= icon('x', 20) ?></span>
+            <h3><?= monitorFa($monitorSummary['down']) ?></h3>
+            <p>میرور قطع</p>
+        </div>
+        <div class="stat-card highlight">
+            <span class="stat-icon"><?= icon('heart', 20) ?></span>
+            <h3><?= $monitorSummary['uptime_percent'] !== null ? monitorFa(number_format($monitorSummary['uptime_percent'], 2)) . '٪' : '—' ?></h3>
+            <p>آپتایم کل (۳۰ روز)</p>
+            <span class="stat-sub">آخرین چرخه: <?= monitorTimeAgoFa($monitorSummary['last_run_at']) ?></span>
         </div>
     </div>
 </section>

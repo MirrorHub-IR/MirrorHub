@@ -12,6 +12,9 @@ try {
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `" . DB_NAME . "`");
 
+    // توابع سامانهٔ پایش میرورها (ساخت جداول در انتها، پس از ساخت جداول اصلی)
+    require_once __DIR__ . '/includes/monitoring.php';
+
     $stmt = $pdo->query("SHOW TABLES LIKE 'users'");
     if ($stmt->fetch()) {
         $error = "پایگاه داده قبلاً نصب شده است. در صورت نیاز به نصب مجدد، جداول را به‌صورت دستی حذف کنید.";
@@ -33,9 +36,12 @@ try {
                 `slug` VARCHAR(100) NOT NULL UNIQUE,
                 `description` TEXT,
                 `parent_id` INT DEFAULT NULL,
+                `type` ENUM('software', 'provider') NOT NULL,
+                `icon` VARCHAR(255) DEFAULT NULL,
                 `sort_order` INT DEFAULT 0,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (`parent_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
+                FOREIGN KEY (`parent_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL,
+                INDEX `idx_type` (`type`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
@@ -126,12 +132,15 @@ try {
         $stmt = $pdo->prepare("INSERT INTO `users` (`username`, `password_hash`, `role`) VALUES (?, ?, 'admin')");
         $stmt->execute(['admin', $adminPass]);
 
-        $stmt = $pdo->prepare("INSERT INTO `categories` (`name`, `slug`, `description`, `sort_order`) VALUES (?, ?, ?, ?)");
-        $stmt->execute(['دسته‌بندی عمومی', 'general', 'دسته‌بندی پیش‌فرض برای میرورها', 1]);
+        $stmt = $pdo->prepare("INSERT INTO `categories` (`name`, `slug`, `description`, `type`, `sort_order`) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute(['دسته‌بندی عمومی', 'general', 'دسته‌بندی پیش‌فرض برای میرورها', 'software', 1]);
 
         $installed = true;
         $message = "نصب با موفقیت انجام شد!";
     }
+
+    // جداول سامانهٔ پایش میرورها (ایمن در برابر اجرای چندباره)
+    ensureMonitorSchema($pdo);
 } catch (PDOException $e) {
     $error = "خطا در اتصال یا اجرای کوئری‌ها: " . $e->getMessage();
 }

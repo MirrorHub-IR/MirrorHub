@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/functions.php';
+require_once 'includes/monitoring.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -100,6 +101,49 @@ try {
                 'categories' => (int)$stats['categories'],
                 'visits_today' => $visits['today'],
                 'visits_total' => $visits['total'],
+            ];
+            break;
+
+        case 'monitor_summary':
+            $summary = monitorStatusSummary($pdo);
+            $summary['last_run_ago'] = monitorTimeAgoFa($summary['last_run_at']);
+            $summary['last_run_fa'] = monitorFaDateTime($summary['last_run_at']);
+            $mirrorRows = array_map(function ($row) {
+                return [
+                    'id'             => (int)$row['id'],
+                    'status'         => $row['status'],
+                    'response_ms'    => $row['last_response_ms'] !== null ? (int)$row['last_response_ms'] : null,
+                    'http_code'      => $row['last_http_code'] !== null ? (int)$row['last_http_code'] : null,
+                    'uptime_percent' => $row['uptime_percent'] !== null ? (float)$row['uptime_percent'] : null,
+                    'down_since'     => $row['down_since'],
+                    'last_checked_at'=> $row['last_checked_at'],
+                ];
+            }, monitorMirrorRows($pdo));
+            $response['success'] = true;
+            $response['data'] = [
+                'summary'  => $summary,
+                'mirrors'  => $mirrorRows,
+                'generated_at' => date('c'),
+            ];
+            break;
+
+        case 'monitor_history':
+            $mirrorId = (int)($_GET['mirror_id'] ?? 0);
+            if ($mirrorId <= 0) {
+                $response['message'] = 'mirror_id is required';
+                break;
+            }
+            $mirror = getMirrorById($pdo, $mirrorId);
+            if (!$mirror) {
+                $response['message'] = 'Mirror not found';
+                http_response_code(404);
+                break;
+            }
+            $response['success'] = true;
+            $response['data'] = [
+                'mirror'  => ['id' => (int)$mirror['id'], 'name_fa' => $mirror['name_fa'], 'name_en' => $mirror['name_en'], 'url' => $mirror['url']],
+                'latency' => monitorLatencySeries($pdo, $mirrorId, 50),
+                'daily'   => array_values(monitorUptimeSeries($pdo, $mirrorId, 30)),
             ];
             break;
 

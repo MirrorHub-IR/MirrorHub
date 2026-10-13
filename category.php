@@ -21,6 +21,9 @@ foreach ($mirrors as &$m) {
 }
 unset($m);
 
+// وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
+$monitorStatuses = monitorStatusMap($pdo, array_column($mirrors, 'id'));
+
 renderHeader($category['name']);
 ?>
 
@@ -51,12 +54,14 @@ renderHeader($category['name']);
     <h2 class="section-title">زیردسته‌بندی‌ها</h2>
     <div class="grid grid-cols-3">
         <?php foreach ($subCategories as $subCat): ?>
-            <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($subCat['slug']) ?>" class="card category-card">
-                <h3><?= htmlspecialchars($subCat['name']) ?></h3>
-                <?php if ($subCat['description']): ?>
-                    <p><?= htmlspecialchars(excerpt($subCat['description'], 80)) ?></p>
-                <?php endif; ?>
-            </a>
+            <div class="card category-card">
+                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($subCat['slug']) ?>" class="category-card-link">
+                    <h3><?= htmlspecialchars($subCat['name']) ?></h3>
+                    <?php if ($subCat['description']): ?>
+                        <p><?= htmlspecialchars(excerpt($subCat['description'], 80)) ?></p>
+                    <?php endif; ?>
+                </a>
+            </div>
         <?php endforeach; ?>
     </div>
 </section>
@@ -78,12 +83,16 @@ renderHeader($category['name']);
                                 <span class="mirror-name-en"><?= htmlspecialchars($names['en']) ?></span>
                             <?php endif; ?>
                         </div>
-                        <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                        <div class="mirror-actions">
+                            <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                            <?= pingButton($mirror['url']) ?>
+                        </div>
                     </div>
                     <?php if ($mirror['description']): ?>
                         <p class="mirror-desc"><?= htmlspecialchars($mirror['description']) ?></p>
                     <?php endif; ?>
                     <div class="mirror-meta">
+                        <?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?>
                         <?= protocolBadges($mirror['protocols'] ?? getMirrorProtocols($pdo, $mirror['id'])) ?>
                         <?php foreach ($mirror['categories'] as $c): ?>
                             <?php if ($c['id'] != $category['id']): ?>
