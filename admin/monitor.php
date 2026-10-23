@@ -410,17 +410,17 @@ renderHeader('پایش سرورها', true);
             <tbody>
                 <?php foreach ($incidents as $inc): ?>
                     <tr>
-                        <td><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
-                        <td><?= monitorFaDateTime($inc['started_at']) ?></td>
-                        <td>
+                        <td data-label="میرور"><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
+                        <td data-label="شروع"><?= monitorFaDateTime($inc['started_at']) ?></td>
+                        <td data-label="پایان">
                             <?php if ($inc['ended_at']): ?>
                                 <?= monitorFaDateTime($inc['ended_at']) ?>
                             <?php else: ?>
                                 <span class="mon-badge mon-down"><span class="mon-dot"></span>ادامه دارد</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= $inc['duration_s'] !== null ? monitorDurationFa((int)$inc['duration_s']) : '—' ?></td>
-                        <td class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
+                        <td data-label="مدت"><?= $inc['duration_s'] !== null ? monitorDurationFa((int)$inc['duration_s']) : '—' ?></td>
+                        <td data-label="دلیل" class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -466,13 +466,13 @@ renderHeader('پایش سرورها', true);
                 <tbody>
                     <?php foreach ($recent as $check): ?>
                         <tr>
-                            <td><?= monitorFaDateTime($check['checked_at']) ?></td>
-                            <td><?= htmlspecialchars(trim($check['name_fa'] . ' ' . $check['name_en'], ' ')) ?></td>
-                            <td><span class="mon-badge mon-sm mon-<?= htmlspecialchars($check['status']) ?>"><span class="mon-dot"></span><?= monitorStatusFa($check['status']) ?></span></td>
-                            <td><?= $check['response_ms'] !== null ? monitorFa((int)$check['response_ms']) . ' ms' : '—' ?></td>
-                            <td><?= $check['http_code'] ? monitorFa((int)$check['http_code']) : '—' ?></td>
-                            <td class="ltr-text"><?= htmlspecialchars($check['method']) ?></td>
-                            <td class="mon-incident-note"><?= htmlspecialchars($check['error'] ?? '—') ?></td>
+                            <td data-label="زمان"><?= monitorFaDateTime($check['checked_at']) ?></td>
+                            <td data-label="میرور"><?= htmlspecialchars(trim($check['name_fa'] . ' ' . $check['name_en'], ' ')) ?></td>
+                            <td data-label="نتیجه"><span class="mon-badge mon-sm mon-<?= htmlspecialchars($check['status']) ?>"><span class="mon-dot"></span><?= monitorStatusFa($check['status']) ?></span></td>
+                            <td data-label="زمان پاسخ"><?= $check['response_ms'] !== null ? monitorFa((int)$check['response_ms']) . ' ms' : '—' ?></td>
+                            <td data-label="کد"><?= $check['http_code'] ? monitorFa((int)$check['http_code']) : '—' ?></td>
+                            <td data-label="روش" class="ltr-text"><?= htmlspecialchars($check['method']) ?></td>
+                            <td data-label="توضیح" class="mon-incident-note"><?= htmlspecialchars($check['error'] ?? '—') ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
