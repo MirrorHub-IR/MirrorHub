@@ -94,7 +94,7 @@ renderHeader($category['name']);
         <?php foreach ($relatedGuides as $guide): ?>
             <article class="cms-article-card">
                 <?php if (!empty($guide['published_at'])): ?>
-                    <div class="cms-article-meta"><time><?= htmlspecialchars(date('Y/m/d', strtotime($guide['published_at']))) ?></time></div>
+                    <div class="cms-article-meta"><time><?= htmlspecialchars(formatDate($guide['published_at'])) ?></time></div>
                 <?php endif; ?>
                 <h3><a href="<?= SITE_URL ?>/guides/<?= rawurlencode($guide['slug']) ?>"><?= htmlspecialchars($guide['title']) ?></a></h3>
                 <?php if (!empty($guide['excerpt'])): ?><p><?= htmlspecialchars($guide['excerpt']) ?></p><?php endif; ?>
