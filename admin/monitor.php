@@ -309,14 +309,17 @@ renderHeader('پایش سرورها', true);
                     <input type="number" id="interval_hours" name="interval_hours" min="1" max="168" value="<?= htmlspecialchars($settings['interval_hours']) ?>">
                     <span class="form-hint">این مقدار برنامهٔ Cron هاست را تغییر نمی‌دهد؛ فقط وقتی Cron در دسترس نباشد، اجرای جایگزین را محدود می‌کند. زمان‌بندی اصلی را در cPanel تنظیم کن.</span>
                 </div>
-                <div class="form-group">
+            </div>
+
+            <details class="mon-advanced-settings" style="margin: 16px 0; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-secondary);">
+                <summary style="cursor: pointer; font-weight: 600;">تنظیمات پیشرفته (تاریخچه، هشدارها و تعداد بررسی)</summary>
+                <div class="form-group" style="margin-top: 16px;">
                     <label for="retention_days">مدت نگهداری تاریخچه (روز)</label>
                     <input type="number" id="retention_days" name="retention_days" min="7" max="730" value="<?= htmlspecialchars($settings['retention_days']) ?>">
                     <span class="form-hint">بررسی‌های قدیمی‌تر خودکار حذف می‌شوند.</span>
                 </div>
-            </div>
 
-            <div class="form-group">
+                <div class="form-group">
                 <label class="mon-check-label">
                     <input type="checkbox" name="alert_down" value="1" <?= $settings['alert_down'] === '1' ? 'checked' : '' ?>>
                     هشدار هنگام قطع شدن میرور ارسال شود
@@ -362,6 +365,8 @@ renderHeader('پایش سرورها', true);
                 <code class="ltr-text mon-key-box" dir="ltr"><?= htmlspecialchars($cronKey !== '' ? $cronKey : 'پس از ذخیرهٔ اولین تنظیمات ساخته می‌شود') ?></code>
                 <span class="form-hint">این کلید را در اختیار سرویس web-cron بگذارید؛ برای امنیت در آدرس بالا قابل تعویض نیست ولی در صورت لو رفتن، با تعریف MONITOR_CRON_KEY در config.php جایگزین می‌شود.</span>
             </div>
+
+            </details>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">ذخیرهٔ تنظیمات</button>
