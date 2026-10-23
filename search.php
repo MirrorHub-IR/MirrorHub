@@ -23,6 +23,11 @@ if ($query) {
     $monitorStatuses = monitorStatusMap($pdo, array_column($results, 'id'));
 }
 
+$GLOBALS['pageSeo'] = [
+    'title' => $query !== '' ? 'نتایج جست‌وجو برای ' . $query . ' | MirrorHub' : 'جست‌وجوی میرورها | MirrorHub',
+    'description' => 'جست‌وجو میان میرورهای نرم‌افزاری بر اساس نام، توضیحات یا آدرس.',
+    'robots' => 'noindex,follow',
+];
 renderHeader('جستجو');
 ?>
 
