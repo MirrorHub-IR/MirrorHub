@@ -49,6 +49,10 @@ try {
             ensureMonitorSchema($pdo);
             monitorMaybeRunDaily($pdo);
         }
+        require_once __DIR__ . '/cms.php';
+        if ($scriptName !== 'install.php') {
+            ensureCmsSchema($pdo);
+        }
     }
 } catch (\PDOException $e) {
     $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
