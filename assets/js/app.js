@@ -850,6 +850,8 @@ document.addEventListener('DOMContentLoaded', () => {
        ============================================================ */
     const categoryFilter = document.getElementById('category-filter');
     if (categoryFilter) {
+        const filterBar = categoryFilter.closest('.category-filter-bar');
+        if (filterBar) filterBar.hidden = false;
         const cards = Array.from(document.querySelectorAll('[data-category-card]'));
         const sections = Array.from(document.querySelectorAll('[data-category-section]'));
         const status = document.getElementById('category-filter-status');
@@ -865,8 +867,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (match) visible++;
             });
             sections.forEach(section => {
-                const hasVisible = !!section.querySelector('[data-category-card]:not([hidden])');
-                section.hidden = !hasVisible;
+                const visibleCards = Array.from(section.querySelectorAll('[data-category-card]:not([hidden])'));
+                section.hidden = visibleCards.length === 0;
+                const countBadge = section.querySelector('[data-category-count]');
+                if (countBadge) countBadge.textContent = visibleCards.length.toLocaleString('fa-IR') + ' دسته‌بندی';
             });
             if (emptyState) emptyState.hidden = !query || visible > 0;
             if (status) {
