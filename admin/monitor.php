@@ -263,7 +263,7 @@ renderHeader('پایش سرورها', true);
             <li>
                 <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با همان فاصله‌ای که برای Cron هاست در نظر گرفته‌ای ثبت کن؛ برنامه این مقدار را از پنل هاست نمی‌خواند، بلکه اجراهای واقعی را ثبت می‌کند:
                 <code class="ltr-text" dir="ltr"><?= $cronUrl ?></code>
-                <a href="<?= $cronTestUrl ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
+                <a href="<?= htmlspecialchars($cronTestUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
                 <span class="form-hint">با باز کردن این آدرس، یک چرخهٔ کامل اجرا می‌شود و پاسخ JSON می‌بینید؛ کلید دسترسی را می‌توانید از تنظیمات زیر ببینید.</span>
             </li>
         </ol>
