@@ -397,6 +397,81 @@ function getMirrorCategoryTags($pdo, $mirrorId) {
     return $all;
 }
 
+/**
+ * Fetch categories and their parent tags for many mirrors in one query.
+ * Listing pages use this instead of N+1 queries for every mirror card.
+ */
+function getMirrorCategoryTagsMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $sql = "SELECT mirror_id, id, name, slug, description, parent_id, type, icon, sort_order
+        FROM (
+            SELECT mc.mirror_id, c.id, c.name, c.slug, c.description, c.parent_id, c.type, c.icon, c.sort_order,
+                   (c.parent_id IS NULL) AS parent_rank
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            WHERE mc.mirror_id IN ($in)
+            UNION
+            SELECT mc.mirror_id, p.id, p.name, p.slug, p.description, p.parent_id, p.type, p.icon, p.sort_order,
+                   (p.parent_id IS NULL) AS parent_rank
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            INNER JOIN categories p ON p.id = c.parent_id
+            WHERE mc.mirror_id IN ($in)
+        ) AS category_tags
+        ORDER BY mirror_id, parent_rank ASC, name ASC";
+    $map = [];
+    try {
+        $stmt = $pdo->query($sql);
+        foreach ($stmt as $row) {
+            $mirrorId = (int)$row['mirror_id'];
+            unset($row['mirror_id'], $row['parent_rank']);
+            $map[$mirrorId][] = $row;
+        }
+    } catch (Throwable $e) {
+        // Listing remains usable on legacy schemas, at the cost of a per-mirror fallback.
+        foreach ($ids as $id) $map[$id] = getMirrorCategoryTags($pdo, $id);
+    }
+    return $map;
+}
+
+/**
+ * Fetch protocol labels for many mirrors in one or two queries.
+ * If the normalized protocol table does not exist, keep compatibility with the legacy mirror.protocol column.
+ */
+function getMirrorProtocolsMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $map = [];
+    if (hasTable($pdo, 'mirror_protocols')) {
+        try {
+            $stmt = $pdo->query("SELECT mirror_id, protocol, custom_label
+                FROM mirror_protocols WHERE mirror_id IN ($in) ORDER BY mirror_id, sort_order ASC, id ASC");
+            foreach ($stmt as $row) {
+                $map[(int)$row['mirror_id']][] = [
+                    'protocol' => $row['protocol'],
+                    'custom_label' => $row['custom_label'] ?? null,
+                ];
+            }
+        } catch (Throwable $e) {
+            $map = [];
+        }
+    }
+
+    $legacy = $pdo->query("SELECT id, protocol FROM mirrors WHERE id IN ($in)");
+    foreach ($legacy as $row) {
+        $id = (int)$row['id'];
+        if (!empty($map[$id]) || empty($row['protocol'])) continue;
+        $map[$id] = [[
+            'protocol' => $row['protocol'] === 'other' ? 'custom' : $row['protocol'],
+            'custom_label' => $row['protocol'] === 'other' ? 'سایر' : null,
+        ]];
+    }
+    return $map;
+}
+
 function setMirrorCategories($pdo, $mirrorId, array $categoryIds) {
     $pdo->prepare("DELETE FROM mirror_categories WHERE mirror_id = ?")->execute([(int)$mirrorId]);
     $categoryIds = array_filter(array_unique(array_map('intval', $categoryIds)), fn($id) => $id > 0);
