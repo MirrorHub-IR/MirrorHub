@@ -8,7 +8,13 @@ function renderHeader($title = '', $isAdmin = false) {
     }
 
     $siteName = SITE_NAME;
-    $pageTitle = $title ? "$title | $siteName" : $siteName;
+    $seo = $GLOBALS['pageSeo'] ?? [];
+    $metaTitle = trim((string)($seo['title'] ?? ''));
+    $pageTitle = $metaTitle !== '' ? $metaTitle : ($title ? "$title | $siteName" : $siteName);
+    $metaDescription = trim((string)($seo['description'] ?? ''));
+    if ($metaDescription === '') $metaDescription = "$siteName - مخزن میرورهای نرم‌افزاری";
+    $canonicalUrl = trim((string)($seo['canonical'] ?? ''));
+    $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
     $flashSuccess = flash('success');
     $flashError = flash('error');
     $currentPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
@@ -18,16 +24,20 @@ function renderHeader($title = '', $isAdmin = false) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="<?= htmlspecialchars($siteName) ?> - مخزن میرورهای نرم‌افزاری">
+    <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <meta name="theme-color" content="#0e1410">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <link rel="stylesheet" href="<?= asset('css/style.css') ?>">
     <link rel="icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="shortcut icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:site_name" content="<?= htmlspecialchars($siteName) ?>">
-    <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?>">
+    <meta property="og:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if (!empty($seo['published'])): ?><meta property="article:published_time" content="<?= htmlspecialchars((string)$seo['published'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
+    <?php if (!empty($seo['modified'])): ?><meta property="article:modified_time" content="<?= htmlspecialchars((string)$seo['modified'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <meta property="og:image" content="<?= SITE_URL ?>/assets/logo.png">
 </head>
 <body class="<?= $isAdmin ? 'admin-layout' : 'public-layout' ?>">
@@ -55,6 +65,9 @@ function renderHeader($title = '', $isAdmin = false) {
                     <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>">
                         <?= icon('server', 15) ?><span>میرورها</span>
                     </a>
+                    <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>">
+                        <?= icon('activity', 15) ?><span>راهنماها</span>
+                    </a>
                     <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>">
                         <?= icon('activity', 15) ?><span>پایش سرورها</span>
                     </a>
@@ -76,6 +89,9 @@ function renderHeader($title = '', $isAdmin = false) {
                     </a>
                     <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>">
                         <?= icon('search', 15) ?><span>جستجو</span>
+                    </a>
+                    <a href="<?= SITE_URL ?>/docs/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>">
+                        <?= icon('activity', 15) ?><span>راهنماها</span>
                     </a>
                     <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>">
                         <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
