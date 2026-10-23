@@ -19,6 +19,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $reqAction = $_POST['req_action'] ?? '';
 
+    if ($reqAction === 'test_bale') {
+        $savedSettings = monitorSettings($pdo);
+        if (empty($savedSettings['bale_bot_token']) || empty($savedSettings['bale_chat_id'])) {
+            flash('error', 'ابتدا توکن ربات بله و شناسهٔ مقصد را ذخیره کنید.');
+        } elseif (monitorNotify($savedSettings, '✅ پیام آزمایشی MirrorHub: اتصال هشدارهای پایش به بله برقرار است.')) {
+            flash('success', 'پیام آزمایشی ارسال شد؛ گفت‌وگوی مقصد را بررسی کنید.');
+        } else {
+            flash('error', 'ارسال پیام آزمایشی ناموفق بود. توکن، شناسهٔ مقصد، دسترسی ربات و اتصال HTTPS را بررسی کنید.');
+        }
+        redirect(SITE_URL . '/admin/monitor.php');
+    }
+
     if ($reqAction === 'run_now') {
         if (function_exists('set_time_limit')) @set_time_limit(300);
         $lastRunResult = monitorRunCycle($pdo, ['force' => true]);
@@ -342,6 +354,13 @@ renderHeader('پایش سرورها', true);
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">ذخیرهٔ تنظیمات</button>
             </div>
+        </form>
+        <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php" class="inline-form" style="margin-top:12px">
+            <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
+            <input type="hidden" name="req_action" value="test_bale">
+            <button type="submit" class="btn btn-outline">ارسال پیام آزمایشی به بله</button>
+            <span class="form-hint">ابتدا تنظیمات را ذخیره کنید؛ سپس پیام آزمایشی ارسال می‌شود.</span>
+        </form>
         </form>
     </div>
 </section>
