@@ -99,6 +99,7 @@ table { max-width: 100%; }
         grid-template-columns: minmax(0, 1fr);
         gap: .3rem;
         width: 100%;
+        max-height: calc(100vh - 6rem);
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
         overscroll-behavior: contain;
@@ -297,7 +298,9 @@ table { max-width: 100%; }
     .mon-hero-copy p { overflow-wrap: anywhere; }
     .uptime-bar { width: 100%; max-width: 100%; }
     .mon-info-box code { white-space: pre-wrap; overflow-wrap: anywhere; }
-    .mh-modal { width: calc(100vw - 1rem); max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+    .mh-modal-overlay { padding: .5rem; }
+    .mh-modal { width: 100%; max-width: 100%; max-height: calc(100vh - 1rem); max-height: calc(100dvh - 1rem); }
+    .mh-modal.wide { max-width: 100%; }
     .mh-modal-body { padding: .9rem; }
     .mh-modal-actions { padding: .8rem .9rem; }
     .footer-copy, .footer-made { overflow-wrap: anywhere; }
