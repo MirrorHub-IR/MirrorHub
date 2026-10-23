@@ -8,11 +8,35 @@ if (!$slug) redirect(SITE_URL . '/index.php');
 
 $category = getCategoryBySlug($pdo, $slug);
 if (!$category) {
-    flash('error', 'دسته‌بندی مورد نظر یافت نشد.');
-    redirect(SITE_URL . '/index.php');
+    http_response_code(404);
+    $GLOBALS['pageSeo'] = [
+        'title' => 'دسته‌بندی پیدا نشد | MirrorHub',
+        'description' => 'دسته‌بندی موردنظر پیدا نشد یا دیگر در دسترس نیست.',
+        'robots' => 'noindex,follow',
+    ];
+    renderHeader('دسته‌بندی پیدا نشد');
+    echo '<section class="section"><h1 class="section-title">دسته‌بندی پیدا نشد</h1><p class="category-desc">این دسته‌بندی وجود ندارد یا دیگر در دسترس نیست.</p><p><a class="btn btn-primary" href="' . htmlspecialchars(rtrim(SITE_URL, '/') . '/', ENT_QUOTES, 'UTF-8') . '">بازگشت به صفحهٔ اصلی</a></p></section>';
+    renderFooter();
+    exit;
 }
 
 $path = getCategoryPath($pdo, $category['id']);
+$categoryDescription = trim(strip_tags((string)($category['description'] ?? '')));
+if ($categoryDescription === '') {
+    $categoryDescription = 'مشاهدهٔ میرورهای فعال، پروتکل‌ها و راهنماهای مرتبط با دسته‌بندی ' . $category['name'] . ' در MirrorHub.';
+}
+$GLOBALS['pageSeo'] = [
+    'title' => $category['name'] . ' | میرورهای نرم‌افزاری در MirrorHub',
+    'description' => mb_substr($categoryDescription, 0, 180),
+    'canonical' => rtrim(SITE_URL, '/') . '/category.php?slug=' . rawurlencode($category['slug']),
+    'breadcrumbs' => array_merge(
+        [['name' => 'خانه', 'url' => rtrim(SITE_URL, '/') . '/']],
+        array_map(
+            fn($item) => ['name' => (string)$item['name'], 'url' => rtrim(SITE_URL, '/') . '/category.php?slug=' . rawurlencode((string)$item['slug'])],
+            $path
+        )
+    ),
+];
 $subCategories = getCategories($pdo, $category['id']);
 $mirrors = getMirrorsByCategory($pdo, $category['id']);
 foreach ($mirrors as &$m) {
