@@ -100,6 +100,7 @@ table { max-width: 100%; }
         gap: .3rem;
         width: 100%;
         max-height: calc(100vh - 6rem);
+        max-height: calc(100vh - 6rem);
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
         overscroll-behavior: contain;
@@ -167,6 +168,7 @@ table { max-width: 100%; }
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: .3rem;
         width: 100%;
+        max-height: calc(100vh - 6rem);
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
         overscroll-behavior: contain;
