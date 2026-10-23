@@ -176,7 +176,7 @@ renderHeader('جست‌وجو');
 <section class="section search-results-section">
     <div class="search-results-summary">
         <div>
-            <h2>نتایج برای «<?= htmlspecialchars($query, ENT_QUOTES, 'UTF-8') ?>»</h2>
+            <h2>نتایج برای «<?= htmlspecialchars($displayQuery, ENT_QUOTES, 'UTF-8') ?>»</h2>
             <p role="status" aria-live="polite"><?= $totalResults ? number_format($totalResults, 0, '.', '٬') . ' نتیجهٔ مرتبط پیدا شد' : 'نتیجه‌ای پیدا نشد؛ عبارت کوتاه‌تر یا املای دیگری را امتحان کنید.' ?></p>
         </div>
         <?php if ($totalResults > 0): ?>
