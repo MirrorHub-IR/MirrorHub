@@ -134,16 +134,16 @@ renderHeader('داشبورد مدیریت', true);
             <tbody>
                 <?php foreach ($recentRequests as $req): ?>
                     <tr>
-                        <td>
+                        <td data-label="نام میرور">
                             <?= htmlspecialchars($req['name_fa']) ?>
                             <?php if (!empty($req['name_en'])): ?>
                                 <br><span class="ltr-text" style="font-size:0.75rem;"><?= htmlspecialchars($req['name_en']) ?></span>
                             <?php endif; ?>
                         </td>
-                        <td class="ltr-text"><?= htmlspecialchars(excerpt($req['url'], 40)) ?></td>
-                        <td><?= htmlspecialchars($req['category_name']) ?></td>
-                        <td><?= formatDate($req['created_at']) ?></td>
-                        <td>
+                        <td data-label="آدرس" class="ltr-text"><?= htmlspecialchars(excerpt($req['url'], 40)) ?></td>
+                        <td data-label="دسته‌بندی پیشنهادی"><?= htmlspecialchars($req['category_name']) ?></td>
+                        <td data-label="تاریخ ثبت"><?= formatDate($req['created_at']) ?></td>
+                        <td data-label="عملیات" class="actions">
                             <a href="<?= SITE_URL ?>/admin/requests.php" class="btn btn-sm btn-primary">بررسی</a>
                         </td>
                     </tr>
