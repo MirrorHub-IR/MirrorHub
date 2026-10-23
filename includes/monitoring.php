@@ -861,7 +861,7 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
                 $secs = max(0, time() - strtotime($alert['down_since']));
                 $duration = "\nمدت قطعی: " . monitorDurationFa($secs);
             }
-            $text = "🟢 برگشت میرور\n«{$name}»\n{$url}\nوضعیت تازه: " . monitorStatusFa($to) . "{$duration}\nزمان: " . date('Y/m/d H:i');
+            $text = "🟢 برگشت میرور\n«{$name}»\n{$url}\nوضعیت تازه: " . monitorStatusFa($to) . "{$duration}\nزمان: " . jalaliFormatDate(time(), 'Y/m/d H:i');
             if (monitorNotify($settings, $text)) $sent++;
         }
     }
