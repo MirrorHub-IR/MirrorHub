@@ -9,6 +9,9 @@ $rows = monitorMirrorRows($pdo);
 $incidents = monitorRecentIncidents($pdo, 10);
 $mirrorLimit = 40;
 $rows = array_slice($rows, 0, $mirrorLimit);
+$monitoredIds = array_column($rows, 'id');
+$uptimeSeriesByMirror = monitorUptimeSeriesMap($pdo, $monitoredIds, 30);
+$latencySeriesByMirror = monitorLatencySeriesMap($pdo, $monitoredIds, 30);
 
 /* وضعیت کلی برای بنر بالای صفحه */
 if ($summary['down'] > 0) {
@@ -116,8 +119,9 @@ renderHeader('وضعیت سرورها');
                     <?php foreach ($rows as $row): ?>
                         <?php
                             $names = mirrorDisplayName($row);
-                            $daily = monitorUptimeSeries($pdo, (int)$row['id'], 30);
-                            $latency = monitorLatencySeries($pdo, (int)$row['id'], 30);
+                            $rowId = (int)$row['id'];
+                            $daily = $uptimeSeriesByMirror[$rowId] ?? [];
+                            $latency = $latencySeriesByMirror[$rowId] ?? [];
                         ?>
                         <tr class="mon-row mon-row-<?= htmlspecialchars($row['status']) ?>">
                             <td data-label="میرور">
