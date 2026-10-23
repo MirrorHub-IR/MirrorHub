@@ -361,7 +361,6 @@ renderHeader('پایش سرورها', true);
             <button type="submit" class="btn btn-outline">ارسال پیام آزمایشی به بله</button>
             <span class="form-hint">ابتدا تنظیمات را ذخیره کنید؛ سپس پیام آزمایشی ارسال می‌شود.</span>
         </form>
-        </form>
     </div>
 </section>
 
