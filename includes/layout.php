@@ -66,7 +66,7 @@ function renderHeader($title = '', $isAdmin = false) {
                         <?= icon('server', 15) ?><span>میرورها</span>
                     </a>
                     <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>">
-                        <?= icon('activity', 15) ?><span>راهنماها</span>
+                        <?= icon('activity', 15) ?><span>مستندات</span>
                     </a>
                     <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>">
                         <?= icon('activity', 15) ?><span>پایش سرورها</span>
@@ -91,7 +91,7 @@ function renderHeader($title = '', $isAdmin = false) {
                         <?= icon('search', 15) ?><span>جستجو</span>
                     </a>
                     <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>">
-                        <?= icon('activity', 15) ?><span>راهنماها</span>
+                        <?= icon('activity', 15) ?><span>مستندات</span>
                     </a>
                     <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>">
                         <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
