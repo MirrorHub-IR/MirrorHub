@@ -934,7 +934,7 @@ function monitorStatusSummary(PDO $pdo): array {
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
             WHERE m.status = 'active'")->fetchColumn();
 
-        $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(*) AS c
+        $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(DISTINCT m.id) AS c
             FROM mirrors m
             INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
