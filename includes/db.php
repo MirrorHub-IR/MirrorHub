@@ -47,7 +47,10 @@ try {
         require_once __DIR__ . '/monitoring.php';
         if ($scriptName !== 'install.php') {
             ensureMonitorSchema($pdo);
-            monitorMaybeRunDaily($pdo);
+            // Avoid starting a second fallback cycle while cron.php is bootstrapping.
+            if ($scriptName !== 'cron.php') {
+                monitorMaybeRunDaily($pdo);
+            }
         }
         require_once __DIR__ . '/cms.php';
         if ($scriptName !== 'install.php') {
