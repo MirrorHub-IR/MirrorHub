@@ -81,7 +81,7 @@ renderHeader('مدیریت راهنماها', true);
 <div class="cms-form-grid">
 <label>عنوان مقاله<input name="title" maxlength="200" required value="<?= htmlspecialchars((string)$article['title']) ?>"></label>
 <label>نامک URL<input name="slug" maxlength="190" value="<?= htmlspecialchars((string)$article['slug']) ?>" placeholder="alpine-repositories"></label>
-<label>دسته نرم‌افزار<select name="category_id"><option value="0">بدون دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option><?php endforeach; ?></select></label>
+<label>راهنمای مربوط به کدام دسته است؟<select name="category_id"><option value="0">بدون اتصال به دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option><?php endforeach; ?></select><small class="form-hint">بعد از انتشار، لینک این راهنما در صفحهٔ همان دستهٔ نرم‌افزاری نمایش داده می‌شود؛ مثلاً دستهٔ Ubuntu.</small></label>
 <label>وضعیت انتشار<select name="status"><option value="draft" <?= $article['status']==='draft'?'selected':'' ?>>پیش‌نویس</option><option value="published" <?= $article['status']==='published'?'selected':'' ?>>منتشرشده</option></select></label>
 </div>
 <label>خلاصه<textarea name="excerpt" rows="2" maxlength="500"><?= htmlspecialchars((string)($article['excerpt'] ?? '')) ?></textarea></label>
