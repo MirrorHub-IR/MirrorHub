@@ -3991,3 +3991,8 @@ table td img {
         backdrop-filter: none;
     }
 }
+
+
+.search-result-group .cms-article-card h3 { font-size: 1.08rem; line-height: 1.65; overflow-wrap: anywhere; }
+.search-result-group .cms-article-card h3 a { color: var(--text-primary); }
+.search-result-group .cms-article-card h3 a:hover { color: var(--accent); }
