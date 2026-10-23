@@ -95,50 +95,50 @@ function renderHeader($title = '', $isAdmin = false) {
             </button>
             <nav id="main-navigation" class="main-nav" aria-label="<?= $isAdmin ? 'ناوبری مدیریت' : 'ناوبری اصلی' ?>">
                 <?php if ($isAdmin): ?>
-                    <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" <?= $currentPage === 'dashboard.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('dashboard', 15) ?><span>داشبورد</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>" <?= $currentPage === 'help.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('book-open', 15) ?><span>راهنمای مدیریت</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" <?= $currentPage === 'categories.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('folder', 15) ?><span>دسته‌بندی‌ها</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>" <?= $currentPage === 'mirrors.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('server', 15) ?><span>میرورها</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>" <?= $currentPage === 'pages.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('activity', 15) ?><span>مستندات</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>" <?= $currentPage === 'monitor.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('activity', 15) ?><span>پایش سرورها</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>" <?= $currentPage === 'requests.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('inbox', 15) ?><span>درخواست‌ها</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/backup.php" class="<?= $currentPage === 'backup.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/backup.php" class="<?= $currentPage === 'backup.php' ? 'active' : '' ?>" <?= $currentPage === 'backup.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('database', 15) ?><span>پشتیبان</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>" <?= $currentPage === 'users.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('users', 15) ?><span>کاربران</span>
                     </a>
                     <a href="<?= SITE_URL ?>/admin/login.php?action=logout" class="btn-logout" title="خروج از حساب">
                         <?= icon('log-out', 14) ?><span>خروج</span>
                     </a>
                 <?php else: ?>
-                    <a href="<?= SITE_URL ?>/index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>" <?= $currentPage === 'index.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('home', 15) ?><span>خانه</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>" <?= $currentPage === 'search.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('search', 15) ?><span>جستجو</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('activity', 15) ?><span>مستندات</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>" <?= $currentPage === 'suggest.php' ? 'aria-current="page"' : '' ?>>
                         <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
                     </a>
                 <?php endif; ?>
