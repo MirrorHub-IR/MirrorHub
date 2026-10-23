@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/jalali.php';
+
 /* ============================================================
    Redirect
    ============================================================ */
@@ -507,9 +509,28 @@ function excerpt($text, $length = 120) {
 }
 
 function formatDate($datetime, $format = 'Y/m/d') {
-    if (empty($datetime)) return '-';
-    $ts = strtotime($datetime);
-    return $ts ? date($format, $ts) : '-';
+    return jalaliFormatDate($datetime, (string)$format, true);
+}
+
+/**
+ * Normalize Persian/Arabic variants and digits before matching user search queries.
+ * This is deliberately local and dependency-free.
+ */
+function normalizeSearchQuery($value, $maxLength = 120) {
+    $value = trim((string)$value);
+    $value = strtr($value, [
+        'ي' => 'ی', 'ى' => 'ی', 'ك' => 'ک', 'ۀ' => 'ه', 'ة' => 'ه',
+        'ـ' => '', '‌' => ' ',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+    ]);
+    $value = preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $value) ?? $value;
+    $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+    if (function_exists('mb_substr')) $value = mb_substr($value, 0, (int)$maxLength, 'UTF-8');
+    else $value = substr($value, 0, (int)$maxLength);
+    return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
 }
 
 function currentUrl() {
