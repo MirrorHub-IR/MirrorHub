@@ -66,6 +66,7 @@ table { max-width: 100%; }
 @media (max-width: 900px) {
     .public-layout .main-header .container,
     .main-header .container {
+        position: relative;
         flex-direction: row;
         align-items: center;
         flex-wrap: nowrap;
@@ -137,6 +138,7 @@ table { max-width: 100%; }
 /* Admin navigation has more destinations, so its compact menu starts earlier. */
 @media (max-width: 1160px) {
     .admin-layout .main-header .container {
+        position: relative;
         flex-direction: row;
         align-items: center;
         flex-wrap: nowrap;
