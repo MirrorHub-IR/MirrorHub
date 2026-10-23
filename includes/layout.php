@@ -90,7 +90,7 @@ function renderHeader($title = '', $isAdmin = false) {
                     <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>">
                         <?= icon('search', 15) ?><span>جستجو</span>
                     </a>
-                    <a href="<?= SITE_URL ?>/docs/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>">
+                    <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>">
                         <?= icon('activity', 15) ?><span>راهنماها</span>
                     </a>
                     <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>">
