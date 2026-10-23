@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/jalali.php';
+
 /* ============================================================
    MirrorHub — سامانه پایش میرورها (Server-side Monitoring)
    ------------------------------------------------------------
@@ -851,7 +853,7 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
         $url = $alert['mirror']['url'];
 
         if ($to === 'down' && (int)($settings['alert_down'] ?? 1) === 1) {
-            $text = "🔴 قطعی میرور\n«{$name}»\n{$url}\nدلیل: " . ($alert['note'] ?? 'نامشخص') . "\nزمان: " . date('Y/m/d H:i');
+            $text = "🔴 قطعی میرور\n«{$name}»\n{$url}\nدلیل: " . ($alert['note'] ?? 'نامشخص') . "\nزمان: " . jalaliFormatDate(time(), 'Y/m/d H:i');
             if (monitorNotify($settings, $text)) $sent++;
         } elseif ($from === 'down' && $to !== 'down' && (int)($settings['alert_recovery'] ?? 1) === 1) {
             $duration = '';
@@ -1160,7 +1162,7 @@ function monitorFa($value): string {
 function monitorFaDateTime(?string $datetime): string {
     if (empty($datetime)) return '—';
     $ts = strtotime($datetime);
-    return $ts ? monitorFa(date('Y/m/d H:i', $ts)) : '—';
+    return $ts ? monitorFa(jalaliFormatDate($ts, 'Y/m/d H:i', false)) : '—';
 }
 
 /** «۵ دقیقه پیش» */
@@ -1233,7 +1235,7 @@ function monitorUptimeBar(array $daily, int $days = 30): string {
     for ($i = $days - 1; $i >= 0; $i--) {
         $day = date('Y-m-d', strtotime("-$i day"));
         $row = $daily[$day] ?? null;
-        $short = date('m/d', strtotime($day));
+        $short = monitorFa(jalaliFormatDate($day, 'm/d', false));
         if (!$row || (int)$row['checks'] === 0) {
             $html .= '<span class="uptime-seg is-none" title="' . $short . ' — بدون بررسی"></span>';
             continue;
