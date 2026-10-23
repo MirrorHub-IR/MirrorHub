@@ -53,9 +53,9 @@ renderHeader('خانه');
 </section>
 
 <?php if (!empty($softwareCategories) || !empty($providerCategories)): ?>
-<section class="category-filter-bar" aria-label="پیدا کردن دسته‌بندی">
+<section class="category-filter-bar" hidden aria-label="پیدا کردن دسته‌بندی">
     <label for="category-filter">دنبال کدام دسته‌بندی هستید؟</label>
-    <input id="category-filter" type="search" placeholder="نام نرم‌افزار یا ارائه‌دهنده را بنویسید..." autocomplete="off" aria-controls="software-categories provider-categories">
+    <input id="category-filter" type="search" placeholder="نام نرم‌افزار یا ارائه‌دهنده را بنویسید..." autocomplete="off" >
     <p id="category-filter-status" role="status" aria-live="polite">برای پیدا کردن سریع‌تر دسته‌بندی، نام آن را بنویسید.</p>
     <p id="category-filter-empty" class="empty-state" hidden>دسته‌بندی‌ای با این عبارت پیدا نشد.</p>
 </section>
@@ -65,7 +65,7 @@ renderHeader('خانه');
 <section class="section category-list-section" id="software-categories" data-category-section>
     <div class="section-header">
         <h2 class="section-title">نرم‌افزارها</h2>
-        <span class="badge badge-primary"><?= count($softwareCategories) ?> دسته‌بندی</span>
+        <span class="badge badge-primary" data-category-count><?= count($softwareCategories) ?> دسته‌بندی</span>
     </div>
     <div class="grid grid-cols-3">
         <?php foreach ($softwareCategories as $cat): ?>
@@ -92,7 +92,7 @@ renderHeader('خانه');
 <section class="section category-list-section" id="provider-categories" data-category-section>
     <div class="section-header">
         <h2 class="section-title">ارائه‌دهندگان</h2>
-        <span class="badge badge-primary"><?= count($providerCategories) ?> دسته‌بندی</span>
+        <span class="badge badge-primary" data-category-count><?= count($providerCategories) ?> دسته‌بندی</span>
     </div>
     <div class="grid grid-cols-3">
         <?php foreach ($providerCategories as $cat): ?>
