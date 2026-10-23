@@ -47,8 +47,8 @@ try {
         require_once __DIR__ . '/monitoring.php';
         if ($scriptName !== 'install.php') {
             ensureMonitorSchema($pdo);
-            // Avoid starting a second fallback cycle while cron.php is bootstrapping.
-            if ($scriptName !== 'cron.php') {
+            // Avoid fallback monitoring cycles from scheduler bootstrap or crawler metadata endpoints.
+            if (!in_array($scriptName, ['cron.php', 'sitemap.php'], true)) {
                 monitorMaybeRunDaily($pdo);
             }
         }
