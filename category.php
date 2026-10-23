@@ -61,6 +61,9 @@ if (($category['type'] ?? '') === 'software') {
     $guideQuery->execute([(int)$category['id']]);
     $relatedGuides = $guideQuery->fetchAll();
 }
+if (!empty($relatedGuides)) {
+    $GLOBALS['pageSeo']['styles'] = ['css/cms.css'];
+}
 
 renderHeader($category['name']);
 ?>
@@ -88,7 +91,6 @@ renderHeader($category['name']);
 </section>
 
 <?php if (!empty($relatedGuides)): ?>
-<link rel="stylesheet" href="<?= asset('css/cms.css') ?>">
 <section class="section">
     <div class="section-header">
         <h2 class="section-title">راهنماهای مرتبط با <?= htmlspecialchars($category['name']) ?></h2>
