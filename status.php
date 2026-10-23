@@ -177,23 +177,23 @@ renderHeader('وضعیت سرورها');
             <tbody>
                 <?php foreach ($incidents as $inc): ?>
                     <tr>
-                        <td><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
-                        <td><?= monitorFaDateTime($inc['started_at']) ?></td>
-                        <td>
+                        <td data-label="میرور"><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
+                        <td data-label="شروع قطعی"><?= monitorFaDateTime($inc['started_at']) ?></td>
+                        <td data-label="پایان">
                             <?php if ($inc['ended_at']): ?>
                                 <?= monitorFaDateTime($inc['ended_at']) ?>
                             <?php else: ?>
                                 <span class="mon-badge mon-down"><span class="mon-dot"></span>ادامه دارد</span>
                             <?php endif; ?>
                         </td>
-                        <td>
+                        <td data-label="مدت">
                             <?php if ($inc['duration_s'] !== null): ?>
                                 <?= monitorDurationFa((int)$inc['duration_s']) ?>
                             <?php else: ?>
                                 —
                             <?php endif; ?>
                         </td>
-                        <td class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
+                        <td data-label="دلیل" class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
