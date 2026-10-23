@@ -111,6 +111,10 @@ $summary = monitorStatusSummary($pdo);
 $rows = monitorMirrorRows($pdo);
 $incidents = monitorRecentIncidents($pdo, 10);
 $cronKey = monitorCronKey($pdo);
+$intervalHours = monitorConfiguredIntervalHours($settings);
+$cronExpression = monitorCronExpression($intervalHours);
+$windowsSchedule = $intervalHours < 24 ? 'HOURLY' : 'DAILY';
+$windowsModifier = $intervalHours < 24 ? $intervalHours : max(1, (int)($intervalHours / 24));
 $cronUrl = SITE_URL . '/cron.php?key=' . ($cronKey !== '' ? htmlspecialchars($cronKey) : 'YOUR_KEY');
 $cronTestUrl = $cronUrl . '&source=manual';
 $scheme = parse_url(SITE_URL, PHP_URL_SCHEME) ?: 'https';
@@ -132,7 +136,7 @@ renderHeader('پایش سرورها', true);
     </div>
     <p class="section-desc">
         سامانه فقط میرورهای متصل به دستهٔ «ارائه‌دهنده» را پایش می‌کند. فاصلهٔ پشتیبان داخل برنامه
-        <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت است؛ فاصلهٔ واقعی Cron از اجرای زمان‌بند هاست ثبت می‌شود.
+        بازهٔ تنظیم‌شدهٔ اجرای پایش: <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong>. برنامه همین بازه را رعایت می‌کند و صفحهٔ وضعیت عمومی نیز همین مقدار را نمایش می‌دهد.
         <?php if (!empty($summary['observed_cron_interval_seconds'])): ?>
             فاصلهٔ مشاهده‌شده بین دو اجرای اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>.
         <?php elseif (!empty($summary['last_cron_run_at'])): ?>
@@ -253,23 +257,23 @@ renderHeader('پایش سرورها', true);
         </p>
         <ol class="mon-cron-list">
             <li>
-                <strong>cron سرور (توصیه‌شده، نمونهٔ ساعتی):</strong> اگر زمان‌بندی تو متفاوت است، همین دستور را با بازهٔ دلخواه هاست هماهنگ کن.
-                <code class="ltr-text">0 * * * * php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
+                <strong>cron سرور (مطابق بازهٔ انتخاب‌شده):</strong>
+                <code class="ltr-text"><?= htmlspecialchars($cronExpression) ?> php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
             </li>
             <li>
-                <strong>وظیفهٔ زمان‌بندی‌شدهٔ ویندوز:</strong>
-                <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC DAILY /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
+                <strong>وظیفهٔ زمان‌بندی‌شدهٔ ویندوز (مطابق بازهٔ انتخاب‌شده):</strong>
+                <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC <?= htmlspecialchars($windowsSchedule) ?> /MO <?= (int)$windowsModifier ?> /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
             </li>
             <li>
-                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با همان فاصله‌ای که برای Cron هاست در نظر گرفته‌ای ثبت کن؛ برنامه این مقدار را از پنل هاست نمی‌خواند، بلکه اجراهای واقعی را ثبت می‌کند:
+                <strong>سرویس‌های web-cron:</strong> در سرویس زمان‌بندی بیرونی نیز بازهٔ <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong> را انتخاب کن. برنامه بازهٔ تنظیم‌شده را رعایت می‌کند:
                 <code class="ltr-text" dir="ltr"><?= $cronUrl ?></code>
                 <a href="<?= htmlspecialchars($cronTestUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
-                <span class="form-hint">با باز کردن این آدرس، یک چرخهٔ کامل اجرا می‌شود و پاسخ JSON می‌بینید؛ کلید دسترسی را می‌توانید از تنظیمات زیر ببینید.</span>
+                <span class="form-hint">برای اجرای زمان‌بندی‌شده از همین آدرس استفاده کن و بازهٔ <?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?> را در سرویس ثبت کن. لینک آزمایش، یک اجرای دستی انجام می‌دهد.</span>
             </li>
         </ol>
         <p class="mon-hint-line">
             اگر Cron سرور یا web-cron فعال نیست، سایت فقط هنگام بازدید کاربران اجرای جایگزین را امتحان می‌کند؛ این روش برای محیط تولید قابل‌اتکا نیست.
-            فاصلهٔ پشتیبان داخل برنامه: حداکثر یک بار در هر <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت.
+            اگر سرویس Cron بیشتر از این بازه فراخوانی شود، برنامه چرخهٔ واقعی پایش را تا رسیدن موعد بعدی اجرا نمی‌کند. اجرای دستی پنل از این محدودیت مستثنا است.
         </p>
     </div>
 </section>
@@ -305,9 +309,16 @@ renderHeader('پایش سرورها', true);
                     <span class="form-hint">مثلاً ۱۲۰۰ یعنی ۱٫۲ ثانیه؛ اگر پاسخ بیشتر طول بکشد، میرور «کند» است ولی هنوز در دسترس محسوب می‌شود.</span>
                 </div>
                 <div class="form-group">
-                    <label for="interval_hours">فاصلهٔ اجرای جایگزین برنامه (ساعت)</label>
-                    <input type="number" id="interval_hours" name="interval_hours" min="1" max="168" value="<?= htmlspecialchars($settings['interval_hours']) ?>">
-                    <span class="form-hint">این مقدار برنامهٔ Cron هاست را تغییر نمی‌دهد؛ فقط وقتی Cron در دسترس نباشد، اجرای جایگزین را محدود می‌کند. زمان‌بندی اصلی را در cPanel تنظیم کن.</span>
+                    <label for="interval_hours">فاصلهٔ اجرای واقعی پایش</label>
+                    <select id="interval_hours" name="interval_hours">
+                        <?php foreach (monitorIntervalChoices() as $choiceHours): ?>
+                            <option value="<?= (int)$choiceHours ?>" <?= $intervalHours === (int)$choiceHours ? 'selected' : '' ?>><?= htmlspecialchars(monitorIntervalLabel((int)$choiceHours)) ?></option>
+                        <?php endforeach; ?>
+                        <?php if (!in_array($intervalHours, monitorIntervalChoices(), true)): ?>
+                            <option value="<?= (int)$intervalHours ?>" selected>مقدار فعلی قدیمی: هر <?= monitorFa($intervalHours) ?> ساعت</option>
+                        <?php endif; ?>
+                    </select>
+                    <span class="form-hint">این یک تنظیم واحد برای چرخهٔ پایش، دستور پیشنهادی Cron و نمایش عمومی است. پس از تغییر بازه و ذخیره، دستور جدید را در cPanel جایگزین کن.</span>
                 </div>
             </div>
 
