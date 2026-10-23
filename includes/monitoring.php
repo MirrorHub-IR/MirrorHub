@@ -46,13 +46,17 @@ function monitorDefaults(): array {
         'enabled'             => '1',     // ۱ = پایش فعال، ۰ = غیرفعال
         'timeout_seconds'     => '8',     // حداکثر انتظار برای پاسخ هر لینک
         'slow_threshold_ms'   => '1200',  // از این زمان به بعد، وضعیت «کند» محسوب می‌شود
-        'interval_hours'      => '24',    // بازهٔ اجرای خودکار چرخهٔ پایش (پیش‌فرض: روزی یک بار)
+        'interval_hours'      => '1',     // فاصلهٔ مستقل پایش خودکار (ساعت)
+        'batch_limit'          => '200',   // سقف هدف در هر چرخه؛ برای اجرای سبک‌تر
+        'failure_threshold'    => '2',     // تعداد خطاهای متوالی پیش از اعلام قطعی    // بازهٔ اجرای خودکار چرخهٔ پایش (پیش‌فرض: روزی یک بار)
         'retention_days'      => '180',   // نگهداری تاریخچهٔ بررسی‌ها به روز
         'uptime_window_days'  => '30',    // پنجرهٔ محاسبهٔ آپتایم
         'alert_down'          => '1',     // هشدار هنگام قطع شدن میرور
         'alert_recovery'      => '1',     // هشدار هنگام برگشت میرور
-        'telegram_bot_token'  => '',      // توکن ربات تلگرام (اختیاری)
-        'telegram_chat_id'    => '',      // شناسهٔ چت/کانال تلگرام (اختیاری)
+        'bale_bot_token'      => '',      // توکن ربات بله (اختیاری)
+        'bale_chat_id'        => '',      // شناسهٔ مقصد پیام در بله (اختیاری)
+        'telegram_bot_token'  => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
+        'telegram_chat_id'    => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
         'webhook_url'         => '',      // آدرس وب‌هوک دلخواه برای دریافت هشدارها (اختیاری)
         'last_run_at'         => '',
         'last_run_ms'         => '0',
@@ -340,7 +344,7 @@ function monitorProbeUrl(string $url, float $timeoutSec = 8.0): array {
           اعتبارسنجیِ گواهی تلاش می‌کنیم و یادداشت صادقانه می‌زنیم.
           روی سرورهایی که CA درست دارند، اعتبارسنجی کامل باقی می‌ماند. */
     $sslVerified = true;
-    if ($info['errno'] === CURLE_PEER_FAILED_VERIFICATION && monitorCaBundleMissing()) {
+    if (false && $info['errno'] === CURLE_PEER_FAILED_VERIFICATION && monitorCaBundleMissing()) {
         $retry = $run([
             CURLOPT_NOBODY         => false,
             CURLOPT_TIMEOUT        => (int)ceil($timeoutSec) + 1,
@@ -543,10 +547,20 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
         $slowMs    = monitorClampInt($settings['slow_threshold_ms'], 100, 30000, 1200);
         $retention = monitorClampInt($settings['retention_days'], 7, 730, 180);
         $winDays   = monitorClampInt($settings['uptime_window_days'], 7, 365, 30);
-        $limit     = monitorClampInt($opts['limit'] ?? 200, 1, 1000, 200);
+        $limit     = monitorClampInt($opts['limit'] ?? $settings['batch_limit'] ?? 200, 1, 1000, 200);
+        $failureThreshold = monitorClampInt($settings['failure_threshold'] ?? 2, 1, 5, 2);
         $deadline  = microtime(true) + (float)($opts['budget_seconds'] ?? 600);
 
-        $mirrors = $pdo->prepare("SELECT id, name_fa, name_en, url FROM mirrors WHERE status = 'active' ORDER BY id ASC LIMIT $limit");
+        // فقط میرورهایی که به حداقل یک دستهٔ «ارائه‌دهنده» وصل‌اند پایش می‌شوند.
+        // ترتیب بر اساس قدیمی‌ترین بررسی باعث می‌شود فهرست بزرگ‌تر از batch_limit هم در چرخه‌های بعدی نوبت بگیرد.
+        $mirrors = $pdo->prepare("SELECT m.id, m.name_fa, m.name_en, m.url
+            FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+            WHERE m.status = 'active'
+            GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at
+            ORDER BY COALESCE(ms.last_checked_at, '1970-01-01 00:00:00') ASC, m.id ASC LIMIT $limit");
         $mirrors->execute();
         $mirrors = $mirrors->fetchAll();
 
@@ -592,8 +606,22 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
                 continue;
             }
 
+            // یک خطای گذرا به‌تنهایی قطعی محسوب نمی‌شود؛ یک بار دیگر پس از مکث کوتاه امتحان کن.
             $probe = monitorProbeUrl($url, $timeout);
             [$status, $note] = monitorClassify($probe, $slowMs);
+            if ($status === 'down') {
+                usleep(250000);
+                $retryProbe = monitorProbeUrl($url, $timeout);
+                [$retryStatus, $retryNote] = monitorClassify($retryProbe, $slowMs);
+                if ($retryStatus !== 'down') {
+                    $probe = $retryProbe;
+                    $status = $retryStatus;
+                    $note = $retryNote;
+                } else {
+                    $probe = $retryProbe;
+                    $note = 'پس از دو تلاش ناموفق: ' . (string)$retryNote;
+                }
+            }
 
             /* وضعیت قبلی را برای تشخیص تغییر برداریم */
             $prevStmt = $pdo->prepare("SELECT status, down_since, consecutive_failures FROM mirror_status WHERE mirror_id = ?");
@@ -618,6 +646,11 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
 
             /* به‌روزرسانی وضعیت لحظه‌ای */
             $failures = $status === 'down' ? (int)($prev['consecutive_failures'] ?? 0) + 1 : 0;
+            // تا رسیدن به آستانهٔ خطا، وضعیت قبلی حفظ می‌شود تا اختلال کوتاه باعث هشدار کاذب نشود.
+            if ($status === 'down' && $failures < $failureThreshold && $prevStatus !== 'unknown') {
+                $status = $prevStatus;
+                $note = 'خطای موقت (' . $failures . '/' . $failureThreshold . '): ' . (string)$note;
+            }
             $downSince = null;
             if ($status === 'down') {
                 $downSince = ($prev['down_since'] ?? '') ?: date('Y-m-d H:i:s');
