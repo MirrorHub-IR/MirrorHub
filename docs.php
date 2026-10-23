@@ -6,7 +6,15 @@ require_once 'includes/cms.php';
 $slug = trim((string)($_GET['slug'] ?? ''));
 if ($slug === '') {
     $articles = $pdo->query("SELECT a.title,a.slug,a.excerpt,a.published_at,c.name AS category_name,c.slug AS category_slug FROM cms_articles a LEFT JOIN categories c ON c.id=a.category_id WHERE a.status='published' ORDER BY a.published_at DESC,a.id DESC")->fetchAll();
-    $GLOBALS['pageSeo'] = ['title'=>'مستندات','description'=>'راهنماهای کاربردی استفاده از میرورها و تنظیم مخازن نرم‌افزاری در MirrorHub.','canonical'=>SITE_URL.'/guides/'];
+    $GLOBALS['pageSeo'] = [
+        'title' => 'راهنماهای میرورها و مخازن نرم‌افزاری | MirrorHub',
+        'description' => 'راهنماهای کاربردی برای تنظیم مخازن لینوکس، انتخاب میرورها و رفع خطاهای رایج.',
+        'canonical' => rtrim(SITE_URL, '/') . '/guides/',
+        'breadcrumbs' => [
+            ['name' => 'خانه', 'url' => rtrim(SITE_URL, '/') . '/'],
+            ['name' => 'مستندات', 'url' => rtrim(SITE_URL, '/') . '/guides/'],
+        ],
+    ];
     renderHeader('مستندات');
     ?>
     <link rel="stylesheet" href="<?= asset('css/cms.css') ?>">
