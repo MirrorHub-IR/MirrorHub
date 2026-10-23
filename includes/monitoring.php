@@ -41,6 +41,39 @@ foreach ([
    تنظیمات (monitor_settings)
    ============================================================ */
 
+/** بازه‌های پیشنهادی در پنل؛ مقدارهای قدیمی هم برای سازگاری حفظ می‌شوند. */
+function monitorIntervalChoices(): array {
+    return [1, 2, 3, 4, 6, 8, 12, 24, 48, 72, 168];
+}
+
+function monitorConfiguredIntervalHours(array $settings): int {
+    return max(1, min(168, (int)($settings['interval_hours'] ?? 1)));
+}
+
+/** عبارت cron متناسب با بازهٔ پایش ذخیره‌شده در برنامه. */
+function monitorCronExpression(int $hours): string {
+    $hours = max(1, min(168, $hours));
+    if ($hours >= 24) {
+        // زمان‌بند روزانه فراخوانی می‌شود؛ برنامه با last_run_at بازه‌های چندروزه را اعمال می‌کند.
+        return '0 0 * * *';
+    }
+    if (in_array($hours, [1, 2, 3, 4, 6, 8, 12], true)) {
+        return '0 */' . $hours . ' * * *';
+    }
+    // سازگاری با تنظیم‌های دلخواه قدیمی: cron ساعتی فراخوانی می‌شود و
+    // monitorRunCycle تضمین می‌کند که چرخه زودتر از بازهٔ انتخابی اجرا نشود.
+    return '0 * * * *';
+}
+
+function monitorIntervalLabel(int $hours): string {
+    $hours = max(1, min(168, $hours));
+    if ($hours === 24) return 'روزی یک‌بار (هر ۲۴ ساعت)';
+    if ($hours === 48) return 'هر ۲ روز یک‌بار';
+    if ($hours === 72) return 'هر ۳ روز یک‌بار';
+    if ($hours === 168) return 'هفته‌ای یک‌بار';
+    return 'هر ' . monitorFa($hours) . ' ساعت';
+}
+
 function monitorDefaults(): array {
     return [
         'enabled'             => '1',     // ۱ = پایش فعال، ۰ = غیرفعال
@@ -513,6 +546,19 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
         $out['skipped'] = true;
         $out['reason'] = 'پایش در تنظیمات غیرفعال است.';
         return $out;
+    }
+
+    // اجرای زمان‌بند (cron) نباید از بازه‌ای که ادمین تعیین کرده زودتر چرخه‌ای را انجام دهد.
+    // اجرای دستی پنل با force=true عمداً از این محدودیت عبور می‌کند.
+    $source = (string)($opts['source'] ?? '');
+    if (empty($opts['force']) && in_array($source, ['cron-cli', 'cron-web'], true)) {
+        $intervalHours = monitorConfiguredIntervalHours($settings);
+        $lastRunTs = !empty($settings['last_run_at']) ? strtotime((string)$settings['last_run_at']) : false;
+        if ($lastRunTs !== false && (time() - $lastRunTs) < ($intervalHours * 3600)) {
+            $out['skipped'] = true;
+            $out['reason'] = 'بازهٔ تنظیم‌شدهٔ پایش (' . $intervalHours . ' ساعت) هنوز نگذشته است.';
+            return $out;
+        }
     }
 
     if (!ensureMonitorSchema($pdo)) {
