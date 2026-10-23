@@ -112,6 +112,7 @@ $rows = monitorMirrorRows($pdo);
 $incidents = monitorRecentIncidents($pdo, 10);
 $cronKey = monitorCronKey($pdo);
 $cronUrl = SITE_URL . '/cron.php?key=' . ($cronKey !== '' ? htmlspecialchars($cronKey) : 'YOUR_KEY');
+$cronTestUrl = $cronUrl . '&source=manual';
 $scheme = parse_url(SITE_URL, PHP_URL_SCHEME) ?: 'https';
 
 renderHeader('پایش سرورها', true);
@@ -130,8 +131,15 @@ renderHeader('پایش سرورها', true);
         </div>
     </div>
     <p class="section-desc">
-        پایشگر به‌صورت خودکار هر <strong><?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت</strong>
-        فقط ارائه‌دهندگانِ فعال را بررسی می‌کند، آمار را ثبت می‌کند و در صورت قطعی هشدار می‌فرستد.
+        سامانه فقط میرورهای متصل به دستهٔ «ارائه‌دهنده» را پایش می‌کند. فاصلهٔ پشتیبان داخل برنامه
+        <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت است؛ فاصلهٔ واقعی Cron از اجرای زمان‌بند هاست ثبت می‌شود.
+        <?php if (!empty($summary['observed_cron_interval_seconds'])): ?>
+            فاصلهٔ مشاهده‌شده بین دو اجرای اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>.
+        <?php elseif (!empty($summary['last_cron_run_at'])): ?>
+            آخرین اجرای ثبت‌شدهٔ Cron: <strong><?= monitorTimeAgoFa($summary['last_cron_run_at']) ?></strong>؛ برای تخمین فاصله به اجرای بعدی نیاز است.
+        <?php else: ?>
+            هنوز اجرای Cron ثبت نشده؛ پس از دو اجرای زمان‌بند، فاصلهٔ واقعی در اینجا نمایش داده می‌شود.
+        <?php endif; ?>
     </p>
 
     <div class="stats-grid">
@@ -245,7 +253,7 @@ renderHeader('پایش سرورها', true);
         </p>
         <ol class="mon-cron-list">
             <li>
-                <strong>cron سرور (توصیه‌شده):</strong>
+                <strong>cron سرور (توصیه‌شده، نمونهٔ ساعتی):</strong> اگر زمان‌بندی تو متفاوت است، همین دستور را با بازهٔ دلخواه هاست هماهنگ کن.
                 <code class="ltr-text">0 * * * * php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
             </li>
             <li>
@@ -253,21 +261,25 @@ renderHeader('پایش سرورها', true);
                 <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC DAILY /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
             </li>
             <li>
-                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با تکرار ساعتی ثبت کنید:
+                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با همان فاصله‌ای که برای Cron هاست در نظر گرفته‌ای ثبت کن؛ برنامه این مقدار را از پنل هاست نمی‌خواند، بلکه اجراهای واقعی را ثبت می‌کند:
                 <code class="ltr-text" dir="ltr"><?= $cronUrl ?></code>
-                <a href="<?= $cronUrl ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
+                <a href="<?= $cronTestUrl ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
                 <span class="form-hint">با باز کردن این آدرس، یک چرخهٔ کامل اجرا می‌شود و پاسخ JSON می‌بینید؛ کلید دسترسی را می‌توانید از تنظیمات زیر ببینید.</span>
             </li>
         </ol>
         <p class="mon-hint-line">
-            اگر هیچ‌کدام در دسترس نباشد، خود سایت هنگام بازدید کاربران و به‌صورت خودکار چرخه را اجرا می‌کند
-            (حداکثر یک بار در هر <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت).
+            اگر Cron سرور یا web-cron فعال نیست، سایت فقط هنگام بازدید کاربران اجرای جایگزین را امتحان می‌کند؛ این روش برای محیط تولید قابل‌اتکا نیست.
+            فاصلهٔ پشتیبان داخل برنامه: حداکثر یک بار در هر <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت.
         </p>
     </div>
 </section>
 
 <section class="section">
-    <h2 class="section-title">تنظیمات پایش</h2>
+    <h2 class="section-title">تنظیمات پالایش و پایش</h2>
+    <div class="mon-info-box">
+        <h3>راهنمای سریع</h3>
+        <p>زمان انتظار تعیین می‌کند چقدر منتظر پاسخ بمانیم؛ آستانهٔ کندی سرعت پایین را مشخص می‌کند؛ خطای متوالی کمک می‌کند یک قطعی لحظه‌ای به‌اشتباه مشکل دائمی تشخیص داده نشود. مقدارهای پیش‌فرض برای شروع مناسب‌اند.</p>
+    </div>
     <div class="form-container">
         <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php">
             <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
@@ -283,19 +295,19 @@ renderHeader('پایش سرورها', true);
 
             <div class="editor-grid">
                 <div class="form-group">
-                    <label for="timeout_seconds">مهلت پاسخ هر لینک (ثانیه)</label>
+                    <label for="timeout_seconds">چند ثانیه برای پاسخ هر میرور صبر کنیم؟</label>
                     <input type="number" id="timeout_seconds" name="timeout_seconds" min="2" max="30" value="<?= htmlspecialchars($settings['timeout_seconds']) ?>">
-                    <span class="form-hint">بین ۲ تا ۳۰؛ اگر لینک تا این زمان پاسخ ندهد «قطعی» ثبت می‌شود.</span>
+                    <span class="form-hint">اگر لینک در این زمان پاسخ ندهد، یک بار دیگر امتحان می‌شود؛ بین ۲ تا ۳۰ ثانیه.</span>
                 </div>
                 <div class="form-group">
-                    <label for="slow_threshold_ms">آستانهٔ «کند» (میلی‌ثانیه)</label>
+                    <label for="slow_threshold_ms">از چه زمانی پاسخ «کند» حساب شود؟ (میلی‌ثانیه)</label>
                     <input type="number" id="slow_threshold_ms" name="slow_threshold_ms" min="100" max="30000" value="<?= htmlspecialchars($settings['slow_threshold_ms']) ?>">
-                    <span class="form-hint">زمان پاسخ بالاتر از این مقدار، وضعیت «کند» می‌گیرد (آپتایم حساب می‌شود).</span>
+                    <span class="form-hint">مثلاً ۱۲۰۰ یعنی ۱٫۲ ثانیه؛ اگر پاسخ بیشتر طول بکشد، میرور «کند» است ولی هنوز در دسترس محسوب می‌شود.</span>
                 </div>
                 <div class="form-group">
-                    <label for="interval_hours">فاصلهٔ پایش خودکار (ساعت)</label>
+                    <label for="interval_hours">فاصلهٔ اجرای جایگزین برنامه (ساعت)</label>
                     <input type="number" id="interval_hours" name="interval_hours" min="1" max="168" value="<?= htmlspecialchars($settings['interval_hours']) ?>">
-                    <span class="form-hint">این بازه فقط برای پایش ارائه‌دهندگان است؛ زمان‌بند سرور باید ساعتی اجرا شود.</span>
+                    <span class="form-hint">این مقدار برنامهٔ Cron هاست را تغییر نمی‌دهد؛ فقط وقتی Cron در دسترس نباشد، اجرای جایگزین را محدود می‌کند. زمان‌بندی اصلی را در cPanel تنظیم کن.</span>
                 </div>
                 <div class="form-group">
                     <label for="retention_days">مدت نگهداری تاریخچه (روز)</label>
@@ -328,14 +340,14 @@ renderHeader('پایش سرورها', true);
             </div>
             <div class="editor-grid">
                 <div class="form-group">
-                    <label for="batch_limit">حداکثر ارائه‌دهنده در هر چرخه</label>
+                    <label for="batch_limit">چند میرور در هر اجرا بررسی شود؟</label>
                     <input type="number" id="batch_limit" name="batch_limit" min="1" max="1000" value="<?= htmlspecialchars($settings['batch_limit']) ?>">
-                    <span class="form-hint">میرورهایی که دیرتر بررسی شده‌اند در اولویت هستند تا فهرست‌های بزرگ از قلم نیفتند.</span>
+                    <span class="form-hint">برای شروع ۲۰۰ مناسب است. اگر میرورها بیشتر باشند، میرورهای بررسی‌نشده یا قدیمی‌تر در اجراهای بعدی نوبت می‌گیرند.</span>
                 </div>
                 <div class="form-group">
-                    <label for="failure_threshold">تعداد خطای متوالی برای ثبت قطعی</label>
+                    <label for="failure_threshold">چند چرخهٔ ناموفق تا اعلام قطعی؟</label>
                     <input type="number" id="failure_threshold" name="failure_threshold" min="1" max="5" value="<?= htmlspecialchars($settings['failure_threshold']) ?>">
-                    <span class="form-hint">برای کاهش قطعی کاذب؛ هر بررسی ناموفق یک بار دیگر هم امتحان می‌شود.</span>
+                    <span class="form-hint">برای کم‌شدن هشدار اشتباه، پیشنهاد می‌شود روی ۲ بماند؛ هر بررسی هم در همان چرخه یک بار دوباره امتحان می‌شود.</span>
                 </div>
             </div>
 
