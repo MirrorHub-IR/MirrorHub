@@ -690,58 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ============================================================
-       Responsive Navigation
-       ============================================================ */
-    const mainHeader = document.querySelector('.main-header');
-    const navToggle = document.querySelector('.nav-toggle');
-    const mainNav = document.getElementById('main-navigation');
-
-    if (mainHeader && navToggle && mainNav) {
-        const closeNavigation = () => {
-            mainHeader.classList.remove('nav-open');
-            navToggle.setAttribute('aria-expanded', 'false');
-            navToggle.setAttribute('aria-label', 'باز کردن منو');
-        };
-
-        navToggle.addEventListener('click', () => {
-            const open = mainHeader.classList.toggle('nav-open');
-            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            navToggle.setAttribute('aria-label', open ? 'بستن منو' : 'باز کردن منو');
-        });
-
-        mainNav.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', closeNavigation);
-        });
-
-        document.addEventListener('click', e => {
-            if (mainHeader.classList.contains('nav-open') && !mainHeader.contains(e.target)) {
-                closeNavigation();
-            }
-        });
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeNavigation();
-        });
-
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 760) closeNavigation();
-        });
-    }
-
-    /* ============================================================
-       Focus Search on '/' key
-       ============================================================ */
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-            const searchInput = document.querySelector('.search-form input[name="q"]');
-            if (searchInput) {
-                e.preventDefault();
-                searchInput.focus();
-            }
-        }
-    });
-
-    /* ============================================================
        Review Request Modal
        ============================================================ */
     document.querySelectorAll('[data-review-request]').forEach(btn => {
@@ -845,43 +793,5 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#39;');
     }
 
-    /* ============================================================
-       Homepage category filter (progressive enhancement)
-       ============================================================ */
-    const categoryFilter = document.getElementById('category-filter');
-    if (categoryFilter) {
-        const filterBar = categoryFilter.closest('.category-filter-bar');
-        if (filterBar) filterBar.hidden = false;
-        const cards = Array.from(document.querySelectorAll('[data-category-card]'));
-        const sections = Array.from(document.querySelectorAll('[data-category-section]'));
-        const status = document.getElementById('category-filter-status');
-        const emptyState = document.getElementById('category-filter-empty');
-
-        const applyCategoryFilter = () => {
-            const query = categoryFilter.value.trim().toLocaleLowerCase();
-            let visible = 0;
-            cards.forEach(card => {
-                const haystack = (card.dataset.search || card.textContent || '').toLocaleLowerCase();
-                const match = !query || haystack.includes(query);
-                card.hidden = !match;
-                if (match) visible++;
-            });
-            sections.forEach(section => {
-                const visibleCards = Array.from(section.querySelectorAll('[data-category-card]:not([hidden])'));
-                section.hidden = visibleCards.length === 0;
-                const countBadge = section.querySelector('[data-category-count]');
-                if (countBadge) countBadge.textContent = visibleCards.length.toLocaleString('fa-IR') + ' دسته‌بندی';
-            });
-            if (emptyState) emptyState.hidden = !query || visible > 0;
-            if (status) {
-                status.textContent = query
-                    ? (visible.toLocaleString('fa-IR') + ' دسته‌بندی پیدا شد.')
-                    : 'برای پیدا کردن سریع‌تر دسته‌بندی، نام آن را بنویسید.';
-            }
-        };
-
-        categoryFilter.addEventListener('input', applyCategoryFilter);
-        categoryFilter.addEventListener('search', applyCategoryFilter);
-    }
 
 });
