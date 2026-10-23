@@ -130,7 +130,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         foreach ($backupTables as $table) {
             if (!in_array($table, $availableTables, true)) throw new RuntimeException("جدول «{$table}» در پایگاه داده فعلی موجود نیست.");
             if (!isset($backup['tables'][$table]) || !is_array($backup['tables'][$table]['rows'] ?? null)) {
-                throw new RuntimeException("فایل پشتیبان ناقص یا نامعتبر است: «{$table}».");
+                // Backward compatibility: backups created before the CMS have no article table.
+                if ($table === 'cms_articles') {
+                    $backup['tables'][$table] = ['columns' => [], 'rows' => []];
+                } else {
+                    throw new RuntimeException("فایل پشتیبان ناقص یا نامعتبر است: «{$table}».");
+                }
             }
             $columnMap[$table] = tableColumns($pdo, $table);
         }
