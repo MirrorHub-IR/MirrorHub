@@ -929,10 +929,16 @@ function monitorStatusSummary(PDO $pdo): array {
         'open_incidents' => 0, 'total_checks' => 0,
     ];
     try {
-        $out['mirrors'] = (int)$pdo->query("SELECT COUNT(*) FROM mirrors WHERE status = 'active'")->fetchColumn();
+        $out['mirrors'] = (int)$pdo->query("SELECT COUNT(DISTINCT m.id) FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            WHERE m.status = 'active'")->fetchColumn();
 
         $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(*) AS c
-            FROM mirrors m LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+            FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
             WHERE m.status = 'active' GROUP BY COALESCE(ms.status, 'unknown')");
         foreach ($stmt as $row) {
             $key = in_array($row['status'], ['up', 'slow', 'down'], true) ? $row['status'] : 'unknown';
@@ -949,7 +955,10 @@ function monitorStatusSummary(PDO $pdo): array {
             $out['total_checks'] = (int)$agg['total'];
         }
 
-        $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(*) FROM mirror_incidents WHERE ended_at IS NULL")->fetchColumn();
+        $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(DISTINCT i.id) FROM mirror_incidents i
+            INNER JOIN mirror_categories mc ON mc.mirror_id = i.mirror_id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            WHERE i.ended_at IS NULL")->fetchColumn();
 
         $settings = monitorSettings($pdo);
         $out['last_run_at'] = $settings['last_run_at'] ?: null;
@@ -970,8 +979,11 @@ function monitorMirrorRows(PDO $pdo): array {
                     ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
                     ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
                 FROM mirrors m
+                INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+                INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
                 LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
                 WHERE m.status = 'active'
+                GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url, ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error, ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
                 ORDER BY FIELD(COALESCE(ms.status, 'unknown'), 'down', 'slow', 'unknown', 'up'), m.name_fa ASC");
         return $stmt->fetchAll();
     } catch (Throwable $e) {
