@@ -1,6 +1,39 @@
-# MirrorHub CMS friendly URLs
+# MirrorHub routing and dependency-free static delivery
 RewriteEngine On
+
+# Stable public guide URLs
 RewriteRule ^guides/?$ docs.php [L,QSA]
 RewriteRule ^guides/([^/]+)/?$ docs.php?slug=$1 [L,QSA,B]
+
+# Crawler discovery endpoints
 RewriteRule ^sitemap\.xml$ sitemap.php [L]
 RewriteRule ^robots\.txt$ robots.php [L]
+
+# Compress text responses when mod_deflate is available.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain text/html text/css text/javascript application/javascript application/x-javascript application/json application/xml text/xml image/svg+xml
+</IfModule>
+
+# Asset URLs are versioned by asset(); cache immutable static assets for a year.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 7 days"
+    ExpiresByType image/jpeg "access plus 7 days"
+    ExpiresByType image/webp "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 7 days"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\\.(css|js)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\\.(png|jpe?g|webp|svg|ico)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+    Header merge Vary Accept-Encoding
+</IfModule>
+
+FileETag MTime Size
