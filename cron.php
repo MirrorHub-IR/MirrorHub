@@ -56,10 +56,19 @@ if (!$isCli) {
 
 if (!$isCli) {
     $force = isset($_GET['force']) && $_GET['force'] === '1';
+    $requestedSource = (string)($_GET['source'] ?? '');
+    $source = $requestedSource === 'auto' ? 'auto' : ($requestedSource === 'manual' ? 'manual' : 'cron-web');
 } else {
+    $source = 'cron-cli';
     foreach (array_slice($argv ?? [], 1) as $arg) {
         if ($arg === '--force') $force = true;
     }
+}
+
+// Cron schedule is controlled by the hosting panel, so record actual invocations
+// (not internal fallback triggers or one-off manual tests) to estimate its cadence.
+if ($source === 'cron-cli' || $source === 'cron-web') {
+    monitorRecordCronInvocation($pdo);
 }
 
 /* جلوگیری از قطع شدن اجرای خط فرمان توسط زمان‌بند وب‌سرور */
@@ -68,7 +77,7 @@ if (function_exists('set_time_limit')) {
 }
 @ini_set('max_execution_time', '300');
 
-$result = monitorRunCycle($pdo, ['force' => $force]);
+$result = monitorRunCycle($pdo, ['force' => $force, 'source' => $source]);
 
 if ($isCli) {
     if (!empty($result['skipped'])) {
