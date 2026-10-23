@@ -5,7 +5,7 @@ require_once '../includes/layout.php';
 requireAdmin();
 
 const MIRRORHUB_BACKUP_VERSION = 1;
-$backupTables = ['users','categories','mirrors','mirror_categories','requests','visits','mirror_protocols','request_protocols'];
+$backupTables = ['users','categories','mirrors','mirror_categories','requests','visits','mirror_protocols','request_protocols','cms_articles'];
 
 function tableColumns(PDO $pdo, string $table): array {
     $rows = $pdo->query("SHOW COLUMNS FROM $table")->fetchAll(PDO::FETCH_ASSOC);
@@ -139,10 +139,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
 
         if ($mode === 'replace') {
-            foreach (['mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
+            foreach (['cms_articles','mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
                 $pdo->exec("DELETE FROM $table");
             }
-            foreach (['users','categories','mirrors','requests','visits','mirror_categories','mirror_protocols','request_protocols'] as $table) {
+            foreach (['users','categories','mirrors','requests','visits','mirror_categories','mirror_protocols','request_protocols','cms_articles'] as $table) {
                 foreach (fetchBackupRows($backup, $table) as $row) insertRow($pdo, $table, $row, $columnMap[$table], true);
             }
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
@@ -225,6 +225,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
                     $stmt = $pdo->prepare('INSERT IGNORE INTO request_protocols (request_id, protocol, custom_label, sort_order) VALUES (?, ?, ?, ?)');
                     $stmt->execute([$requestId, $row['protocol'] ?? '', $row['custom_label'] ?? null, (int)($row['sort_order'] ?? 0)]);
                 }
+            }
+
+            // CMS articles share the same category and user records as the rest of MirrorHub.
+            foreach (fetchBackupRows($backup, 'cms_articles') as $row) {
+                $slug = (string)($row['slug'] ?? '');
+                if ($slug === '' || findByValue($pdo, 'cms_articles', 'slug', $slug)) continue;
+                $row['category_id'] = mappedId($maps['categories'], $row['category_id'] ?? null, 'دسته مقاله');
+                $row['created_by'] = mappedId($maps['users'], $row['created_by'] ?? null, 'نویسنده مقاله');
+                $row['updated_by'] = mappedId($maps['users'], $row['updated_by'] ?? null, 'ویرایشگر مقاله');
+                insertRow($pdo, 'cms_articles', $row, $columnMap['cms_articles'], false);
             }
 
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
