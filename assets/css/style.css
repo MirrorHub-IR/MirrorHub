@@ -3978,3 +3978,16 @@ table td img {
     .search-suggestion-list { grid-template-columns: 1fr; }
     .search-results-summary { align-items: stretch; }
 }
+
+
+/* Keep scrolling and sticky navigation inexpensive on touch devices. */
+@media (max-width: 760px) {
+    body { background-attachment: scroll; }
+    .main-header,
+    .public-layout .main-header,
+    .admin-layout .main-header {
+        background: rgba(14, 20, 16, .97);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
