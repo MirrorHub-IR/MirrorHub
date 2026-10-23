@@ -13,11 +13,36 @@ function renderHeader($title = '', $isAdmin = false) {
     $pageTitle = $metaTitle !== '' ? $metaTitle : ($title ? "$title | $siteName" : $siteName);
     $metaDescription = trim((string)($seo['description'] ?? ''));
     if ($metaDescription === '') $metaDescription = "$siteName - مخزن میرورهای نرم‌افزاری";
+    $currentPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
     $canonicalUrl = trim((string)($seo['canonical'] ?? ''));
+    if ($canonicalUrl === '' && !$isAdmin && $currentPage !== 'search.php') {
+        $canonicalPath = ($currentPage === 'index.php' || $currentPage === '') ? '' : rawurlencode($currentPage);
+        $canonicalUrl = rtrim(SITE_URL, '/') . '/' . $canonicalPath;
+    }
+    $robotsContent = trim((string)($seo['robots'] ?? 'index,follow'));
+    if ($isAdmin) $robotsContent = 'noindex,nofollow';
     $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
+    $structuredData = [[
+        '@context' => 'https://schema.org',
+        '@type' => 'WebSite',
+        'name' => $siteName,
+        'url' => rtrim(SITE_URL, '/') . '/',
+        'inLanguage' => 'fa-IR',
+    ]];
+    if (!$isAdmin && !empty($seo['breadcrumbs']) && is_array($seo['breadcrumbs'])) {
+        $items = [];
+        foreach (array_values($seo['breadcrumbs']) as $index => $crumb) {
+            if (!is_array($crumb) || empty($crumb['name'])) continue;
+            $item = ['@type' => 'ListItem', 'position' => count($items) + 1, 'name' => (string)$crumb['name']];
+            if (!empty($crumb['url'])) $item['item'] = (string)$crumb['url'];
+            $items[] = $item;
+        }
+        if (count($items) > 1) {
+            $structuredData[] = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $items];
+        }
+    }
     $flashSuccess = flash('success');
     $flashError = flash('error');
-    $currentPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -25,6 +50,7 @@ function renderHeader($title = '', $isAdmin = false) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="robots" content="<?= htmlspecialchars($robotsContent, ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <meta name="theme-color" content="#0e1410">
     <title><?= htmlspecialchars($pageTitle) ?></title>
@@ -32,6 +58,9 @@ function renderHeader($title = '', $isAdmin = false) {
     <link rel="icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="shortcut icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
+    <meta property="og:locale" content="fa_IR">
+    <?php if ($canonicalUrl !== ''): ?><meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
+    <meta name="twitter:card" content="summary">
     <meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:site_name" content="<?= htmlspecialchars($siteName) ?>">
     <meta property="og:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
@@ -39,8 +68,12 @@ function renderHeader($title = '', $isAdmin = false) {
     <?php if (!empty($seo['published'])): ?><meta property="article:published_time" content="<?= htmlspecialchars((string)$seo['published'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <?php if (!empty($seo['modified'])): ?><meta property="article:modified_time" content="<?= htmlspecialchars((string)$seo['modified'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <meta property="og:image" content="<?= SITE_URL ?>/assets/logo.png">
+    <?php if (!$isAdmin): foreach ($structuredData as $schema): ?>
+    <script type="application/ld+json"><?= json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
+    <?php endforeach; endif; ?>
 </head>
 <body class="<?= $isAdmin ? 'admin-layout' : 'public-layout' ?>">
+    <a class="skip-link" href="#main-content">رفتن به محتوای اصلی</a>
     <header class="main-header">
         <div class="container">
             <a href="<?= SITE_URL ?>/<?= $isAdmin ? 'admin/dashboard.php' : 'index.php' ?>" class="logo">
@@ -54,7 +87,7 @@ function renderHeader($title = '', $isAdmin = false) {
                     aria-controls="main-navigation">
                 <span></span><span></span><span></span>
             </button>
-            <nav id="main-navigation" class="main-nav">
+            <nav id="main-navigation" class="main-nav" aria-label="<?= $isAdmin ? 'ناوبری مدیریت' : 'ناوبری اصلی' ?>">
                 <?php if ($isAdmin): ?>
                     <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
                         <?= icon('dashboard', 15) ?><span>داشبورد</span>
@@ -107,7 +140,7 @@ function renderHeader($title = '', $isAdmin = false) {
         </div>
     </header>
 
-    <main class="container main-content">
+    <main id="main-content" class="container main-content" tabindex="-1">
         <?php if ($flashSuccess): ?>
             <div class="alert alert-success"><?= htmlspecialchars($flashSuccess) ?></div>
         <?php endif; ?>
