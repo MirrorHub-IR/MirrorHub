@@ -76,7 +76,7 @@ renderHeader('خانه');
             <div class="card category-card" data-category-card data-search="<?= htmlspecialchars($cat['name'] . ' ' . $cat['slug'] . ' ' . ($cat['description'] ?? '') . ' ' . ($cat['parent_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                 <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
                     <?php if (!empty($cat['icon'])): ?>
-                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">
+                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon" width="40" height="40" loading="lazy" decoding="async">
                     <?php endif; ?>
                     <?php if ($cat['parent_name']): ?>
                         <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
