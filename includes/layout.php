@@ -184,7 +184,8 @@ function renderFooter() {
     <?php
         $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
         $adminRoute = strpos((string)($_SERVER['SCRIPT_NAME'] ?? ''), '/admin/') !== false;
-        $needsAdminInteractions = $adminRoute && $scriptName !== 'login.php';
+        $adminInteractionPages = ['categories.php', 'mirrors.php', 'pages.php', 'monitor.php', 'requests.php', 'backup.php', 'users.php'];
+        $needsAdminInteractions = $adminRoute && in_array($scriptName, $adminInteractionPages, true);
         $needsPing = !$adminRoute && in_array($scriptName, ['index.php', 'search.php', 'category.php'], true);
     ?>
     <script>window.MH_SITE_URL = <?= json_encode(SITE_URL, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
