@@ -3,7 +3,9 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/layout.php';
 
-$query = normalizeSearchQuery($_GET['q'] ?? '');
+$displayQuery = trim((string)($_GET['q'] ?? ''));
+$displayQuery = function_exists('mb_substr') ? mb_substr($displayQuery, 0, 120, 'UTF-8') : substr($displayQuery, 0, 120);
+$query = normalizeSearchQuery($displayQuery);
 $terms = array_values(array_filter(preg_split('/\\s+/u', $query) ?: [], static fn($term) => $term !== ''));
 $terms = array_slice($terms, 0, 8);
 
@@ -126,7 +128,7 @@ if ($terms) {
 }
 
 $GLOBALS['pageSeo'] = [
-    'title' => $query !== '' ? 'نتایج جست‌وجوی «' . $query . '» | MirrorHub' : 'جست‌وجوی میرورها | MirrorHub',
+    'title' => $query !== '' ? 'نتایج جست‌وجوی «' . $displayQuery . '» | MirrorHub' : 'جست‌وجوی میرورها | MirrorHub',
     'description' => 'جست‌وجوی میرورهای نرم‌افزاری، دسته‌بندی‌ها و راهنماها بر اساس نام، توضیحات یا آدرس.',
     'robots' => 'noindex,follow',
     'styles' => $guideResults ? ['css/cms.css'] : [],
@@ -143,7 +145,7 @@ renderHeader('جست‌وجو');
 
     <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form large search-page-form" role="search" aria-label="جست‌وجوی میرورها، دسته‌بندی‌ها و راهنماها">
         <label class="visually-hidden" for="search-query">عبارت جست‌وجو</label>
-        <input id="search-query" type="search" name="q" value="<?= htmlspecialchars($query, ENT_QUOTES, 'UTF-8') ?>" placeholder="مثلاً Ubuntu، Debian، Alpine یا مخزن..." maxlength="120" autocomplete="off" spellcheck="false" required>
+        <input id="search-query" type="search" name="q" value="<?= htmlspecialchars($displayQuery, ENT_QUOTES, 'UTF-8') ?>" placeholder="مثلاً Ubuntu، Debian، Alpine یا مخزن..." maxlength="120" autocomplete="off" spellcheck="false" required>
         <button type="submit">جست‌وجو</button>
         <?php if ($query !== ''): ?>
             <a class="btn btn-outline search-clear" href="<?= SITE_URL ?>/search.php">پاک‌کردن</a>
@@ -171,11 +173,11 @@ renderHeader('جست‌وجو');
 </section>
 <?php else: ?>
 <?php $totalResults = count($mirrorResults) + count($categoryResults) + count($guideResults); ?>
-<section class="section search-results-section" aria-live="polite">
+<section class="section search-results-section">
     <div class="search-results-summary">
         <div>
             <h2>نتایج برای «<?= htmlspecialchars($query, ENT_QUOTES, 'UTF-8') ?>»</h2>
-            <p><?= $totalResults ? number_format($totalResults, 0, '.', '٬') . ' نتیجهٔ مرتبط پیدا شد' : 'نتیجه‌ای پیدا نشد؛ عبارت کوتاه‌تر یا املای دیگری را امتحان کنید.' ?></p>
+            <p role="status" aria-live="polite"><?= $totalResults ? number_format($totalResults, 0, '.', '٬') . ' نتیجهٔ مرتبط پیدا شد' : 'نتیجه‌ای پیدا نشد؛ عبارت کوتاه‌تر یا املای دیگری را امتحان کنید.' ?></p>
         </div>
         <?php if ($totalResults > 0): ?>
             <div class="search-result-jumps" aria-label="رفتن به گروه نتایج">
