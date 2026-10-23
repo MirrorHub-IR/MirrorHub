@@ -59,6 +59,9 @@ function renderHeader($title = '', $isAdmin = false) {
                     <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
                         <?= icon('dashboard', 15) ?><span>داشبورد</span>
                     </a>
+                    <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>">
+                        <?= icon('book-open', 15) ?><span>راهنمای مدیریت</span>
+                    </a>
                     <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>">
                         <?= icon('folder', 15) ?><span>دسته‌بندی‌ها</span>
                     </a>
