@@ -1,0 +1,5 @@
+# MirrorHub CMS friendly URLs
+RewriteEngine On
+RewriteRule ^guides/?$ docs.php [L,QSA]
+RewriteRule ^guides/([a-zA-Z0-9\x{0600}-\x{06FF}-]+)/?$ docs.php?slug=$1 [L,QSA,B]
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
