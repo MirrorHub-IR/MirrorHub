@@ -70,7 +70,6 @@ $categories=$pdo->query("SELECT id,name FROM categories WHERE type='software' OR
 $articles=$pdo->query("SELECT a.id,a.title,a.slug,a.status,a.updated_at,c.name AS category_name FROM cms_articles a LEFT JOIN categories c ON c.id=a.category_id ORDER BY a.updated_at DESC")->fetchAll();
 renderHeader('مدیریت راهنماها', true);
 ?>
-<link rel="stylesheet" href="<?= asset('css/cms.css') ?>">
 <section class="section">
 <div class="section-header"><h1 class="section-title">مدیریت راهنماها</h1><a class="btn btn-primary" href="<?= SITE_URL ?>/admin/pages.php?action=add">مقاله جدید</a></div>
 <p class="category-desc">محتوای Markdown، انتشار، SEO و اتصال به دسته‌های نرم‌افزار از همین پنل مدیریت می‌شود.</p>
