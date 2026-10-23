@@ -27,6 +27,9 @@ function renderHeader($title = '', $isAdmin = false) {
         $canonicalPath = ($currentPage === 'index.php' || $currentPage === '') ? '' : rawurlencode($currentPage);
         $canonicalUrl = rtrim(SITE_URL, '/') . '/' . $canonicalPath;
     }
+    $extraStyles = is_array($seo['styles'] ?? null) ? $seo['styles'] : [];
+    if (!$extraStyles && $currentPage === 'docs.php') $extraStyles = ['css/cms.css'];
+    if (!$extraStyles && $isAdmin && $currentPage === 'pages.php') $extraStyles = ['css/cms.css'];
     $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
     $structuredData = [[
         '@context' => 'https://schema.org',
@@ -61,6 +64,9 @@ function renderHeader($title = '', $isAdmin = false) {
     <meta name="theme-color" content="#0e1410">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <link rel="stylesheet" href="<?= asset('css/style.css') ?>">
+    <?php foreach ($extraStyles as $stylePath): ?>
+        <link rel="stylesheet" href="<?= htmlspecialchars(asset((string)$stylePath), ENT_QUOTES, 'UTF-8') ?>">
+    <?php endforeach; ?>
     <link rel="icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="shortcut icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
@@ -169,7 +175,7 @@ function renderFooter() {
                     <span class="footer-tagline">مخزن میرورهای نرم‌افزاری</span>
                 </div>
             </div>
-            <p class="footer-copy">&copy; <?= date('Y') ?> <?= htmlspecialchars(SITE_NAME) ?>. تمامی حقوق محفوظ است.</p>
+            <p class="footer-copy">&copy; <?= jalaliFormatDate(time(), 'Y') ?> <?= htmlspecialchars(SITE_NAME) ?>. تمامی حقوق محفوظ است.</p>
             <p class="footer-made">ساخته شده با <span class="heart"><?= icon('heart', 14) ?></span> در ایران</p>
         </div>
     </footer>
