@@ -46,13 +46,17 @@ function monitorDefaults(): array {
         'enabled'             => '1',     // ۱ = پایش فعال، ۰ = غیرفعال
         'timeout_seconds'     => '8',     // حداکثر انتظار برای پاسخ هر لینک
         'slow_threshold_ms'   => '1200',  // از این زمان به بعد، وضعیت «کند» محسوب می‌شود
-        'interval_hours'      => '24',    // بازهٔ اجرای خودکار چرخهٔ پایش (پیش‌فرض: روزی یک بار)
+        'interval_hours'      => '1',     // فاصلهٔ مستقل پایش خودکار (ساعت)
+        'batch_limit'          => '200',   // سقف هدف در هر چرخه؛ برای اجرای سبک‌تر
+        'failure_threshold'    => '2',     // تعداد خطاهای متوالی پیش از اعلام قطعی    // بازهٔ اجرای خودکار چرخهٔ پایش (پیش‌فرض: روزی یک بار)
         'retention_days'      => '180',   // نگهداری تاریخچهٔ بررسی‌ها به روز
         'uptime_window_days'  => '30',    // پنجرهٔ محاسبهٔ آپتایم
         'alert_down'          => '1',     // هشدار هنگام قطع شدن میرور
         'alert_recovery'      => '1',     // هشدار هنگام برگشت میرور
-        'telegram_bot_token'  => '',      // توکن ربات تلگرام (اختیاری)
-        'telegram_chat_id'    => '',      // شناسهٔ چت/کانال تلگرام (اختیاری)
+        'bale_bot_token'      => '',      // توکن ربات بله (اختیاری)
+        'bale_chat_id'        => '',      // شناسهٔ مقصد پیام در بله (اختیاری)
+        'telegram_bot_token'  => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
+        'telegram_chat_id'    => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
         'webhook_url'         => '',      // آدرس وب‌هوک دلخواه برای دریافت هشدارها (اختیاری)
         'last_run_at'         => '',
         'last_run_ms'         => '0',
@@ -335,28 +339,7 @@ function monitorProbeUrl(string $url, float $timeoutSec = 8.0): array {
         }
     }
 
-    /* ۳) اگر خطای گواهی SSL فقط به‌خاطر نبودِ CA bundle در خودِ PHP
-          باشد (رایج روی ویندوز بدون curl.cainfo)، یک بار بدون
-          اعتبارسنجیِ گواهی تلاش می‌کنیم و یادداشت صادقانه می‌زنیم.
-          روی سرورهایی که CA درست دارند، اعتبارسنجی کامل باقی می‌ماند. */
-    $sslVerified = true;
-    if ($info['errno'] === CURLE_PEER_FAILED_VERIFICATION && monitorCaBundleMissing()) {
-        $retry = $run([
-            CURLOPT_NOBODY         => false,
-            CURLOPT_TIMEOUT        => (int)ceil($timeoutSec) + 1,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_WRITEFUNCTION  => function ($ch, $chunk) {
-                return 0;
-            },
-        ]);
-        if ($retry['errno'] === CURLE_WRITE_ERROR || $retry['http_code'] > 0) {
-            $retry['errno'] = ($retry['errno'] === CURLE_WRITE_ERROR) ? 0 : $retry['errno'];
-            $retry['error'] = '';
-            $info = $retry;
-            $sslVerified = false;
-        }
-    }
+    /* گواهی TLS هرگز دور زده نمی‌شود؛ خطای CA باید به‌عنوان خطای محیط پایشگر دیده شود. */
 
     $result['http_code']    = $info['http_code'];
     $result['redirects']    = $info['redirects'];
@@ -543,10 +526,20 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
         $slowMs    = monitorClampInt($settings['slow_threshold_ms'], 100, 30000, 1200);
         $retention = monitorClampInt($settings['retention_days'], 7, 730, 180);
         $winDays   = monitorClampInt($settings['uptime_window_days'], 7, 365, 30);
-        $limit     = monitorClampInt($opts['limit'] ?? 200, 1, 1000, 200);
+        $limit     = monitorClampInt($opts['limit'] ?? $settings['batch_limit'] ?? 200, 1, 1000, 200);
+        $failureThreshold = monitorClampInt($settings['failure_threshold'] ?? 2, 1, 5, 2);
         $deadline  = microtime(true) + (float)($opts['budget_seconds'] ?? 600);
 
-        $mirrors = $pdo->prepare("SELECT id, name_fa, name_en, url FROM mirrors WHERE status = 'active' ORDER BY id ASC LIMIT $limit");
+        // فقط میرورهایی که به حداقل یک دستهٔ «ارائه‌دهنده» وصل‌اند پایش می‌شوند.
+        // ترتیب بر اساس قدیمی‌ترین بررسی باعث می‌شود فهرست بزرگ‌تر از batch_limit هم در چرخه‌های بعدی نوبت بگیرد.
+        $mirrors = $pdo->prepare("SELECT m.id, m.name_fa, m.name_en, m.url
+            FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+            WHERE m.status = 'active'
+            GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at
+            ORDER BY COALESCE(ms.last_checked_at, '1970-01-01 00:00:00') ASC, m.id ASC LIMIT $limit");
         $mirrors->execute();
         $mirrors = $mirrors->fetchAll();
 
@@ -592,8 +585,22 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
                 continue;
             }
 
+            // یک خطای گذرا به‌تنهایی قطعی محسوب نمی‌شود؛ یک بار دیگر پس از مکث کوتاه امتحان کن.
             $probe = monitorProbeUrl($url, $timeout);
             [$status, $note] = monitorClassify($probe, $slowMs);
+            if ($status === 'down') {
+                usleep(250000);
+                $retryProbe = monitorProbeUrl($url, $timeout);
+                [$retryStatus, $retryNote] = monitorClassify($retryProbe, $slowMs);
+                if ($retryStatus !== 'down') {
+                    $probe = $retryProbe;
+                    $status = $retryStatus;
+                    $note = $retryNote;
+                } else {
+                    $probe = $retryProbe;
+                    $note = 'پس از دو تلاش ناموفق: ' . (string)$retryNote;
+                }
+            }
 
             /* وضعیت قبلی را برای تشخیص تغییر برداریم */
             $prevStmt = $pdo->prepare("SELECT status, down_since, consecutive_failures FROM mirror_status WHERE mirror_id = ?");
@@ -618,6 +625,11 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
 
             /* به‌روزرسانی وضعیت لحظه‌ای */
             $failures = $status === 'down' ? (int)($prev['consecutive_failures'] ?? 0) + 1 : 0;
+            // تا رسیدن به آستانهٔ خطا، وضعیت قبلی حفظ می‌شود تا اختلال کوتاه باعث هشدار کاذب نشود.
+            if ($status === 'down' && $failures < $failureThreshold && $prevStatus !== 'unknown') {
+                $status = $prevStatus;
+                $note = 'خطای موقت (' . $failures . '/' . $failureThreshold . '): ' . (string)$note;
+            }
             $downSince = null;
             if ($status === 'down') {
                 $downSince = ($prev['down_since'] ?? '') ?: date('Y-m-d H:i:s');
@@ -792,25 +804,28 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
 function monitorNotify(array $settings, string $text): bool {
     $delivered = false;
 
-    if (!empty($settings['telegram_bot_token']) && !empty($settings['telegram_chat_id'])) {
-        $ok = false;
-        if (function_exists('curl_init')) {
-            $ch = curl_init('https://api.telegram.org/bot' . $settings['telegram_bot_token'] . '/sendMessage');
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => http_build_query([
-                    'chat_id' => $settings['telegram_chat_id'],
-                    'text'    => $text,
-                ]),
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-            ]);
-            $resp = curl_exec($ch);
-            curl_close($ch);
-            $json = json_decode((string)$resp, true);
-            $ok = is_array($json) && !empty($json['ok']);
+    if (!empty($settings['bale_bot_token']) && !empty($settings['bale_chat_id']) && function_exists('curl_init')) {
+        $token = trim((string)$settings['bale_bot_token']);
+        $chatId = trim((string)$settings['bale_chat_id']);
+        // Bale Bot API follows the sendMessage method and JSON ok/error response pattern.
+        $endpoint = 'https://tapi.bale.ai/bot' . rawurlencode($token) . '/sendMessage';
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => http_build_query(['chat_id' => $chatId, 'text' => mb_substr($text, 0, 4000)]),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $json = json_decode((string)$resp, true);
+        if ($resp !== false && $code >= 200 && $code < 300 && is_array($json) && !empty($json['ok'])) {
+            $delivered = true;
         }
-        if ($ok) $delivered = true;
     }
 
     if (!empty($settings['webhook_url']) && filter_var($settings['webhook_url'], FILTER_VALIDATE_URL)) {
@@ -860,7 +875,7 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         if ((int)$settings['enabled'] !== 1) return;
         if (!ensureMonitorSchema($pdo)) return;
 
-        $intervalH = (float)$settings['interval_hours'];
+        $intervalH = (float)($settings['interval_hours'] ?? 1);
         if ($intervalH <= 0) $intervalH = MONITOR_DEFAULT_CRON_HOURS;
 
         $now = time();
@@ -868,7 +883,8 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         $lastTry = !empty($settings['last_attempt_at']) ? strtotime($settings['last_attempt_at']) : false;
 
         if ($lastRun !== false && ($now - $lastRun) < $intervalH * 3600) return;
-        if ($lastTry !== false && ($now - $lastTry) < 3600) return; // حداکثر یک تلاش در ساعت
+        $attemptCooldown = max(300, min(3600, (int)round($intervalH * 3600)));
+        if ($lastTry !== false && ($now - $lastTry) < $attemptCooldown) return; // جلوگیری از اجرای مکرر در بازدیدهای پرتعداد
 
         $pdo->prepare("INSERT INTO monitor_settings (skey, svalue) VALUES ('last_attempt_at', ?)
             ON DUPLICATE KEY UPDATE svalue = VALUES(svalue)")->execute([date('Y-m-d H:i:s')]);
@@ -913,10 +929,16 @@ function monitorStatusSummary(PDO $pdo): array {
         'open_incidents' => 0, 'total_checks' => 0,
     ];
     try {
-        $out['mirrors'] = (int)$pdo->query("SELECT COUNT(*) FROM mirrors WHERE status = 'active'")->fetchColumn();
+        $out['mirrors'] = (int)$pdo->query("SELECT COUNT(DISTINCT m.id) FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            WHERE m.status = 'active'")->fetchColumn();
 
-        $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(*) AS c
-            FROM mirrors m LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+        $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(DISTINCT m.id) AS c
+            FROM mirrors m
+            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
             WHERE m.status = 'active' GROUP BY COALESCE(ms.status, 'unknown')");
         foreach ($stmt as $row) {
             $key = in_array($row['status'], ['up', 'slow', 'down'], true) ? $row['status'] : 'unknown';
@@ -933,7 +955,10 @@ function monitorStatusSummary(PDO $pdo): array {
             $out['total_checks'] = (int)$agg['total'];
         }
 
-        $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(*) FROM mirror_incidents WHERE ended_at IS NULL")->fetchColumn();
+        $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(DISTINCT i.id) FROM mirror_incidents i
+            INNER JOIN mirror_categories mc ON mc.mirror_id = i.mirror_id
+            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+            WHERE i.ended_at IS NULL")->fetchColumn();
 
         $settings = monitorSettings($pdo);
         $out['last_run_at'] = $settings['last_run_at'] ?: null;
@@ -954,8 +979,11 @@ function monitorMirrorRows(PDO $pdo): array {
                     ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
                     ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
                 FROM mirrors m
+                INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
+                INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
                 LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
                 WHERE m.status = 'active'
+                GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url, ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error, ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
                 ORDER BY FIELD(COALESCE(ms.status, 'unknown'), 'down', 'slow', 'unknown', 'up'), m.name_fa ASC");
         return $stmt->fetchAll();
     } catch (Throwable $e) {

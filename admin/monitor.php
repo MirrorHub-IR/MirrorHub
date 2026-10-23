@@ -19,6 +19,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $reqAction = $_POST['req_action'] ?? '';
 
+    if ($reqAction === 'test_bale') {
+        $savedSettings = monitorSettings($pdo);
+        if (empty($savedSettings['bale_bot_token']) || empty($savedSettings['bale_chat_id'])) {
+            flash('error', 'ابتدا توکن ربات بله و شناسهٔ مقصد را ذخیره کنید.');
+        } elseif (monitorNotify($savedSettings, '✅ پیام آزمایشی MirrorHub: اتصال هشدارهای پایش به بله برقرار است.')) {
+            flash('success', 'پیام آزمایشی ارسال شد؛ گفت‌وگوی مقصد را بررسی کنید.');
+        } else {
+            flash('error', 'ارسال پیام آزمایشی ناموفق بود. توکن، شناسهٔ مقصد، دسترسی ربات و اتصال HTTPS را بررسی کنید.');
+        }
+        redirect(SITE_URL . '/admin/monitor.php');
+    }
+
     if ($reqAction === 'run_now') {
         if (function_exists('set_time_limit')) @set_time_limit(300);
         $lastRunResult = monitorRunCycle($pdo, ['force' => true]);
@@ -36,21 +48,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $enabled = isset($_POST['enabled']) ? '1' : '0';
         $timeout = (int)($_POST['timeout_seconds'] ?? 8);
         $slowMs = (int)($_POST['slow_threshold_ms'] ?? 1200);
-        $interval = (int)($_POST['interval_hours'] ?? 24);
+        $interval = (int)($_POST['interval_hours'] ?? 1);
+        $batchLimit = (int)($_POST['batch_limit'] ?? 200);
+        $failureThreshold = (int)($_POST['failure_threshold'] ?? 2);
         $retention = (int)($_POST['retention_days'] ?? 180);
         $alertDown = isset($_POST['alert_down']) ? '1' : '0';
         $alertRecovery = isset($_POST['alert_recovery']) ? '1' : '0';
-        $tgToken = trim((string)($_POST['telegram_bot_token'] ?? ''));
-        $tgChat = trim((string)($_POST['telegram_chat_id'] ?? ''));
+        $baleToken = trim((string)($_POST['bale_bot_token'] ?? ''));
+        $baleChat = trim((string)($_POST['bale_chat_id'] ?? ''));
         $webhook = trim((string)($_POST['webhook_url'] ?? ''));
 
         $errors = [];
         if ($timeout < 2 || $timeout > 30) $errors[] = 'مهلت پاسخ باید بین ۲ تا ۳۰ ثانیه باشد.';
         if ($slowMs < 100 || $slowMs > 30000) $errors[] = 'آستانهٔ کندی باید بین ۱۰۰ تا ۳۰۰۰۰ میلی‌ثانیه باشد.';
-        if ($interval < 1 || $interval > 168) $errors[] = 'بازهٔ اجرا باید بین ۱ تا ۱۶۸ ساعت باشد.';
+        if ($interval < 1 || $interval > 168) $errors[] = 'بازهٔ پایش باید بین ۱ تا ۱۶۸ ساعت باشد.';
+        if ($batchLimit < 1 || $batchLimit > 1000) $errors[] = 'تعداد هدف در هر چرخه باید بین ۱ تا ۱۰۰۰ باشد.';
+        if ($failureThreshold < 1 || $failureThreshold > 5) $errors[] = 'آستانهٔ خطای متوالی باید بین ۱ تا ۵ باشد.';
         if ($retention < 7 || $retention > 730) $errors[] = 'مدت نگهداری تاریخچه باید بین ۷ تا ۷۳۰ روز باشد.';
         if ($webhook !== '' && !filter_var($webhook, FILTER_VALIDATE_URL)) $errors[] = 'آدرس وب‌هوک معتبر نیست.';
-        if ($tgToken !== '' && $tgChat === '') $errors[] = 'برای استفاده از تلگرام، شناسهٔ چت هم لازم است.';
+        if ($baleToken !== '' && $baleChat === '') $errors[] = 'برای استفاده از بله، شناسهٔ مقصد هم لازم است.';
 
         if ($errors) {
             flash('error', implode(' ', $errors));
@@ -62,11 +78,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'timeout_seconds'    => (string)$timeout,
             'slow_threshold_ms'  => (string)$slowMs,
             'interval_hours'     => (string)$interval,
+            'batch_limit'         => (string)$batchLimit,
+            'failure_threshold'   => (string)$failureThreshold,
             'retention_days'     => (string)$retention,
             'alert_down'         => $alertDown,
             'alert_recovery'     => $alertRecovery,
-            'telegram_bot_token' => $tgToken,
-            'telegram_chat_id'   => $tgChat,
+            'bale_bot_token'     => $baleToken,
+            'bale_chat_id'       => $baleChat,
             'webhook_url'        => $webhook,
         ]);
         flash('success', 'تنظیمات پایش ذخیره شد.');
@@ -113,7 +131,7 @@ renderHeader('پایش سرورها', true);
     </div>
     <p class="section-desc">
         پایشگر به‌صورت خودکار هر <strong><?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت</strong>
-        روی لینک همهٔ میرورهای فعال پینگ سمت سرور می‌گیرد، آمار را ثبت می‌کند و در صورت قطعی هشدار می‌فرستد.
+        فقط ارائه‌دهندگانِ فعال را بررسی می‌کند، آمار را ثبت می‌کند و در صورت قطعی هشدار می‌فرستد.
     </p>
 
     <div class="stats-grid">
@@ -228,14 +246,14 @@ renderHeader('پایش سرورها', true);
         <ol class="mon-cron-list">
             <li>
                 <strong>cron سرور (توصیه‌شده):</strong>
-                <code class="ltr-text">15 4 * * * php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
+                <code class="ltr-text">0 * * * * php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
             </li>
             <li>
                 <strong>وظیفهٔ زمان‌بندی‌شدهٔ ویندوز:</strong>
                 <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC DAILY /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
             </li>
             <li>
-                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با تکرار روزانه ثبت کنید:
+                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با تکرار ساعتی ثبت کنید:
                 <code class="ltr-text" dir="ltr"><?= $cronUrl ?></code>
                 <a href="<?= $cronUrl ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
                 <span class="form-hint">با باز کردن این آدرس، یک چرخهٔ کامل اجرا می‌شود و پاسخ JSON می‌بینید؛ کلید دسترسی را می‌توانید از تنظیمات زیر ببینید.</span>
@@ -275,9 +293,9 @@ renderHeader('پایش سرورها', true);
                     <span class="form-hint">زمان پاسخ بالاتر از این مقدار، وضعیت «کند» می‌گیرد (آپتایم حساب می‌شود).</span>
                 </div>
                 <div class="form-group">
-                    <label for="interval_hours">بازهٔ اجرای خودکار (ساعت)</label>
+                    <label for="interval_hours">فاصلهٔ پایش خودکار (ساعت)</label>
                     <input type="number" id="interval_hours" name="interval_hours" min="1" max="168" value="<?= htmlspecialchars($settings['interval_hours']) ?>">
-                    <span class="form-hint">پیش‌فرض ۲۴ یعنی روزی یک بار.</span>
+                    <span class="form-hint">این بازه فقط برای پایش ارائه‌دهندگان است؛ زمان‌بند سرور باید ساعتی اجرا شود.</span>
                 </div>
                 <div class="form-group">
                     <label for="retention_days">مدت نگهداری تاریخچه (روز)</label>
@@ -299,13 +317,25 @@ renderHeader('پایش سرورها', true);
 
             <div class="editor-grid">
                 <div class="form-group">
-                    <label for="telegram_bot_token">توکن ربات تلگرام (اختیاری)</label>
-                    <input type="text" id="telegram_bot_token" name="telegram_bot_token" dir="ltr" value="<?= htmlspecialchars($settings['telegram_bot_token']) ?>" placeholder="123456:ABC-DEF...">
-                    <span class="form-hint">از @BotFather بسازید؛ پیام‌ها به شناسهٔ چت زیر فرستاده می‌شوند.</span>
+                    <label for="bale_bot_token">توکن ربات بله (اختیاری)</label>
+                    <input type="password" id="bale_bot_token" name="bale_bot_token" dir="ltr" autocomplete="new-password" value="<?= htmlspecialchars($settings['bale_bot_token']) ?>" placeholder="توکن دریافتی از BotFather بله">
+                    <span class="form-hint">توکن در سرور ذخیره می‌شود؛ آن را در مخزن کد یا گزارش‌ها قرار ندهید.</span>
                 </div>
                 <div class="form-group">
-                    <label for="telegram_chat_id">شناسهٔ چت/کانال تلگرام</label>
-                    <input type="text" id="telegram_chat_id" name="telegram_chat_id" dir="ltr" value="<?= htmlspecialchars($settings['telegram_chat_id']) ?>" placeholder="-1001234567890">
+                    <label for="bale_chat_id">شناسهٔ مقصد در بله</label>
+                    <input type="text" id="bale_chat_id" name="bale_chat_id" dir="ltr" value="<?= htmlspecialchars($settings['bale_chat_id']) ?>" placeholder="شناسهٔ گفت‌وگو یا کانال">
+                </div>
+            </div>
+            <div class="editor-grid">
+                <div class="form-group">
+                    <label for="batch_limit">حداکثر ارائه‌دهنده در هر چرخه</label>
+                    <input type="number" id="batch_limit" name="batch_limit" min="1" max="1000" value="<?= htmlspecialchars($settings['batch_limit']) ?>">
+                    <span class="form-hint">میرورهایی که دیرتر بررسی شده‌اند در اولویت هستند تا فهرست‌های بزرگ از قلم نیفتند.</span>
+                </div>
+                <div class="form-group">
+                    <label for="failure_threshold">تعداد خطای متوالی برای ثبت قطعی</label>
+                    <input type="number" id="failure_threshold" name="failure_threshold" min="1" max="5" value="<?= htmlspecialchars($settings['failure_threshold']) ?>">
+                    <span class="form-hint">برای کاهش قطعی کاذب؛ هر بررسی ناموفق یک بار دیگر هم امتحان می‌شود.</span>
                 </div>
             </div>
 
@@ -324,6 +354,12 @@ renderHeader('پایش سرورها', true);
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">ذخیرهٔ تنظیمات</button>
             </div>
+        </form>
+        <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php" class="inline-form" style="margin-top:12px">
+            <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
+            <input type="hidden" name="req_action" value="test_bale">
+            <button type="submit" class="btn btn-outline">ارسال پیام آزمایشی به بله</button>
+            <span class="form-hint">ابتدا تنظیمات را ذخیره کنید؛ سپس پیام آزمایشی ارسال می‌شود.</span>
         </form>
     </div>
 </section>
