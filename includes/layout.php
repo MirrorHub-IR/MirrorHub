@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/jalali.php';
 function renderHeader($title = '', $isAdmin = false) {
     if (!$isAdmin) {
         global $pdo;
@@ -184,7 +185,7 @@ function renderFooter() {
         $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
         $adminRoute = strpos((string)($_SERVER['SCRIPT_NAME'] ?? ''), '/admin/') !== false;
         $needsAdminInteractions = $adminRoute && $scriptName !== 'login.php';
-        $needsPing = in_array($scriptName, ['index.php', 'search.php', 'category.php', 'mirrors.php'], true);
+        $needsPing = !$adminRoute && in_array($scriptName, ['index.php', 'search.php', 'category.php'], true);
     ?>
     <script>window.MH_SITE_URL = <?= json_encode(SITE_URL, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
     <script src="<?= asset('js/site.js') ?>" defer></script>
