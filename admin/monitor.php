@@ -135,14 +135,15 @@ renderHeader('پایش سرورها', true);
         </div>
     </div>
     <p class="section-desc">
-        سامانه فقط میرورهای متصل به دستهٔ «ارائه‌دهنده» را پایش می‌کند. فاصلهٔ پشتیبان داخل برنامه
-        بازهٔ تنظیم‌شدهٔ اجرای پایش: <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong>. برنامه همین بازه را رعایت می‌کند و صفحهٔ وضعیت عمومی نیز همین مقدار را نمایش می‌دهد.
+        سامانه فقط میرورهای فعالی را پایش می‌کند که به یک دستهٔ «ارائه‌دهنده» متصل باشند.
+        بازهٔ فعلی اجرای واقعی پایش: <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong>.
+        همین مقدار در صفحهٔ عمومی وضعیت نمایش داده می‌شود و اجرای زمان‌بندی‌شدهٔ زودتر از موعد را متوقف می‌کند.
         <?php if (!empty($summary['observed_cron_interval_seconds'])): ?>
-            فاصلهٔ مشاهده‌شده بین دو اجرای اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>.
+            فاصلهٔ مشاهده‌شده بین دو فراخوانی اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>.
         <?php elseif (!empty($summary['last_cron_run_at'])): ?>
-            آخرین اجرای ثبت‌شدهٔ Cron: <strong><?= monitorTimeAgoFa($summary['last_cron_run_at']) ?></strong>؛ برای تخمین فاصله به اجرای بعدی نیاز است.
+            آخرین فراخوانی Cron: <strong><?= monitorTimeAgoFa($summary['last_cron_run_at']) ?></strong>؛ برای تخمین فاصله به اجرای بعدی نیاز است.
         <?php else: ?>
-            هنوز اجرای Cron ثبت نشده؛ پس از دو اجرای زمان‌بند، فاصلهٔ واقعی در اینجا نمایش داده می‌شود.
+            هنوز اجرای زمان‌بند ثبت نشده است.
         <?php endif; ?>
     </p>
 
