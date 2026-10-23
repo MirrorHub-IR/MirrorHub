@@ -378,6 +378,29 @@ function getMirrorCategories($pdo, $mirrorId) {
     return $stmt->fetchAll();
 }
 
+/** Fetch only directly assigned categories for many mirrors in one query. */
+function getMirrorCategoriesMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mc.mirror_id, c.*
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            WHERE mc.mirror_id IN ($in)
+            ORDER BY mc.mirror_id, c.sort_order ASC, c.name ASC");
+        foreach ($stmt as $row) {
+            $id = (int)$row['mirror_id'];
+            unset($row['mirror_id']);
+            $map[$id][] = $row;
+        }
+    } catch (Throwable $e) {
+        foreach ($ids as $id) $map[$id] = getMirrorCategories($pdo, $id);
+    }
+    return $map;
+}
+
 function getMirrorCategoryTags($pdo, $mirrorId) {
     $categories = getMirrorCategories($pdo, $mirrorId);
     $parents = [];
