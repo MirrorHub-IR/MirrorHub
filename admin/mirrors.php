@@ -81,11 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $mirrors = $pdo->query("SELECT * FROM mirrors ORDER BY created_at DESC")->fetchAll();
-foreach ($mirrors as &$m) {
-    $m['categories'] = getMirrorCategories($pdo, $m['id']);
+$mirrorIds = array_column($mirrors, 'id');
+$categoryMap = getMirrorCategoriesMap($pdo, $mirrorIds);
+foreach ($mirrors as &$mirror) {
+    $mirror['categories'] = $categoryMap[(int)$mirror['id']] ?? [];
 }
-unset($m);
-$monitorStatuses = monitorStatusMap($pdo, array_column($mirrors, 'id'));
+unset($mirror);
+$monitorStatuses = monitorStatusMap($pdo, $mirrorIds);
 
 $categories = getAllCategories($pdo);
 $currentMirror = null;
