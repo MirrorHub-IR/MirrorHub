@@ -82,6 +82,13 @@ if (!function_exists('jalaliFormatDate')) {
             0=>'یکشنبه', 1=>'دوشنبه', 2=>'سه‌شنبه', 3=>'چهارشنبه',
             4=>'پنجشنبه', 5=>'جمعه', 6=>'شنبه',
         ];
+        $monthShort = [
+            1=>'فرو', 2=>'ارد', 3=>'خرد', 4=>'تیر', 5=>'مرد', 6=>'شهر',
+            7=>'مهر', 8=>'آبا', 9=>'آذر', 10=>'دی', 11=>'بهم', 12=>'اسف',
+        ];
+        $weekdayShort = [
+            0=>'یک', 1=>'دو', 2=>'سه', 3=>'چهار', 4=>'پنج', 5=>'جمع', 6=>'شنبه',
+        ];
         $tokens = [
             'Y'=>(string)$jy, 'y'=>substr((string)$jy, -2),
             'm'=>sprintf('%02d', $jm), 'n'=>(string)$jm,
@@ -90,9 +97,9 @@ if (!function_exists('jalaliFormatDate')) {
             'h'=>date('h', $timestamp), 'g'=>(string)(int)date('g', $timestamp),
             'i'=>date('i', $timestamp), 's'=>date('s', $timestamp),
             'a'=>date('a', $timestamp), 'A'=>date('A', $timestamp),
-            'F'=>$months[$jm], 'M'=>mb_substr($months[$jm], 0, 3, 'UTF-8'),
+            'F'=>$months[$jm], 'M'=>$monthShort[$jm],
             'l'=>$weekdays[(int)date('w', $timestamp)],
-            'D'=>mb_substr($weekdays[(int)date('w', $timestamp)], 0, 3, 'UTF-8'),
+            'D'=>$weekdayShort[(int)date('w', $timestamp)],
         ];
 
         $formatted = '';
