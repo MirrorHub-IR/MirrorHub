@@ -844,4 +844,40 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
+
+    /* ============================================================
+       Homepage category filter (progressive enhancement)
+       ============================================================ */
+    const categoryFilter = document.getElementById('category-filter');
+    if (categoryFilter) {
+        const cards = Array.from(document.querySelectorAll('[data-category-card]'));
+        const sections = Array.from(document.querySelectorAll('[data-category-section]'));
+        const status = document.getElementById('category-filter-status');
+        const emptyState = document.getElementById('category-filter-empty');
+
+        const applyCategoryFilter = () => {
+            const query = categoryFilter.value.trim().toLocaleLowerCase();
+            let visible = 0;
+            cards.forEach(card => {
+                const haystack = (card.dataset.search || card.textContent || '').toLocaleLowerCase();
+                const match = !query || haystack.includes(query);
+                card.hidden = !match;
+                if (match) visible++;
+            });
+            sections.forEach(section => {
+                const hasVisible = !!section.querySelector('[data-category-card]:not([hidden])');
+                section.hidden = !hasVisible;
+            });
+            if (emptyState) emptyState.hidden = !query || visible > 0;
+            if (status) {
+                status.textContent = query
+                    ? (visible.toLocaleString('fa-IR') + ' دسته‌بندی پیدا شد.')
+                    : 'برای پیدا کردن سریع‌تر دسته‌بندی، نام آن را بنویسید.';
+            }
+        };
+
+        categoryFilter.addEventListener('input', applyCategoryFilter);
+        categoryFilter.addEventListener('search', applyCategoryFilter);
+    }
+
 });
