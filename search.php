@@ -129,6 +129,7 @@ $GLOBALS['pageSeo'] = [
     'title' => $query !== '' ? 'نتایج جست‌وجوی «' . $query . '» | MirrorHub' : 'جست‌وجوی میرورها | MirrorHub',
     'description' => 'جست‌وجوی میرورهای نرم‌افزاری، دسته‌بندی‌ها و راهنماها بر اساس نام، توضیحات یا آدرس.',
     'robots' => 'noindex,follow',
+    'styles' => $guideResults ? ['css/cms.css'] : [],
 ];
 renderHeader('جست‌وجو');
 ?>
