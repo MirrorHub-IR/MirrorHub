@@ -23,14 +23,18 @@ $providerCategories = $pdo->query(
 
 $stmt = $pdo->query("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT 12");
 $recentMirrors = $stmt->fetchAll();
+$recentIds = array_column($recentMirrors, 'id');
+$recentCategoryMap = getMirrorCategoryTagsMap($pdo, $recentIds);
+$recentProtocolMap = getMirrorProtocolsMap($pdo, $recentIds);
 foreach ($recentMirrors as &$mirror) {
-    $mirror['categories'] = getMirrorCategoryTags($pdo, $mirror['id']);
-    $mirror['protocols'] = getMirrorProtocols($pdo, $mirror['id']);
+    $id = (int)$mirror['id'];
+    $mirror['categories'] = $recentCategoryMap[$id] ?? [];
+    $mirror['protocols'] = $recentProtocolMap[$id] ?? [];
 }
 unset($mirror);
 
 // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
-$monitorStatuses = monitorStatusMap($pdo, array_column($recentMirrors, 'id'));
+$monitorStatuses = monitorStatusMap($pdo, $recentIds);
 
 $GLOBALS['pageSeo'] = [
     'title' => 'MirrorHub | جست‌وجوی میرورهای نرم‌افزاری و مخازن',
