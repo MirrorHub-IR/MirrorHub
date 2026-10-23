@@ -92,6 +92,7 @@ function monitorDefaults(): array {
         'telegram_chat_id'    => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
         'webhook_url'         => '',      // آدرس وب‌هوک دلخواه برای دریافت هشدارها (اختیاری)
         'last_run_at'         => '',
+        'last_cycle_started_at' => '',
         'last_run_ms'         => '0',
         'last_run_checked'    => '0',
         'last_attempt_at'     => '',
@@ -553,8 +554,12 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
     $source = (string)($opts['source'] ?? '');
     if (empty($opts['force']) && in_array($source, ['cron-cli', 'cron-web'], true)) {
         $intervalHours = monitorConfiguredIntervalHours($settings);
-        $lastRunTs = !empty($settings['last_run_at']) ? strtotime((string)$settings['last_run_at']) : false;
-        if ($lastRunTs !== false && (time() - $lastRunTs) < ($intervalHours * 3600)) {
+        $lastCycleTs = !empty($settings['last_cycle_started_at'])
+            ? strtotime((string)$settings['last_cycle_started_at'])
+            : (!empty($settings['last_run_at']) ? strtotime((string)$settings['last_run_at']) : false);
+        // Small grace window avoids skipping a daily job due to a few seconds of scheduling jitter.
+        $minimumElapsed = max(0, ($intervalHours * 3600) - 300);
+        if ($lastCycleTs !== false && (time() - $lastCycleTs) < $minimumElapsed) {
             $out['skipped'] = true;
             $out['reason'] = 'بازهٔ تنظیم‌شدهٔ پایش (' . $intervalHours . ' ساعت) هنوز نگذشته است.';
             return $out;
@@ -580,6 +585,9 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
     }
 
     try {
+        // Record the start time separately from completion so long cycles don't delay the next scheduled slot.
+        monitorSaveSettings($pdo, ['last_cycle_started_at' => date('Y-m-d H:i:s')]);
+
         $timeout   = monitorClampInt($settings['timeout_seconds'], 2, 30, 8);
         $slowMs    = monitorClampInt($settings['slow_threshold_ms'], 100, 30000, 1200);
         $retention = monitorClampInt($settings['retention_days'], 7, 730, 180);
@@ -937,7 +945,9 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         if ($intervalH <= 0) $intervalH = MONITOR_DEFAULT_CRON_HOURS;
 
         $now = time();
-        $lastRun = !empty($settings['last_run_at']) ? strtotime($settings['last_run_at']) : false;
+        $lastRun = !empty($settings['last_cycle_started_at'])
+            ? strtotime($settings['last_cycle_started_at'])
+            : (!empty($settings['last_run_at']) ? strtotime($settings['last_run_at']) : false);
         $lastTry = !empty($settings['last_attempt_at']) ? strtotime($settings['last_attempt_at']) : false;
 
         if ($lastRun !== false && ($now - $lastRun) < $intervalH * 3600) return;
