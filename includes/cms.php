@@ -43,7 +43,7 @@ function cmsHealthBlock(PDO $pdo, string $slug): string {
     $q = $pdo->prepare("SELECT id,name,slug FROM categories WHERE slug=? AND type='software' LIMIT 1");
     $q->execute([$slug]); $cat = $q->fetch();
     if (!$cat) return '<aside class="cms-callout">دسته‌بندی نرم‌افزار برای کارت سلامت پیدا نشد.</aside>';
-    $q = $pdo->prepare("SELECT m.name_fa,m.name_en,s.status AS health_status,s.response_time_ms
+    $q = $pdo->prepare("SELECT m.name_fa,m.name_en,s.status AS health_status,s.last_response_ms
         FROM mirrors m INNER JOIN mirror_categories mc ON mc.mirror_id=m.id AND mc.category_id=?
         LEFT JOIN mirror_status s ON s.mirror_id=m.id WHERE m.status='active'
         ORDER BY CASE s.status WHEN 'up' THEN 0 WHEN 'online' THEN 0 WHEN 'slow' THEN 1 WHEN 'down' THEN 2 ELSE 3 END,m.name_fa LIMIT 12");
