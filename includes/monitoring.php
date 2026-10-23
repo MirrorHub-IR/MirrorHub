@@ -1090,6 +1090,58 @@ function monitorStatusMap(PDO $pdo, array $mirrorIds): array {
     }
 }
 
+/** Fetch daily uptime series for multiple mirrors with one query. */
+function monitorUptimeSeriesMap(PDO $pdo, array $mirrorIds, int $days = 30): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $days = max(1, min(3660, $days));
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mirror_id, day, checks, up, slow, down, sum_ms
+            FROM mirror_daily_stats
+            WHERE mirror_id IN ($in) AND day >= DATE_SUB(CURDATE(), INTERVAL $days DAY)
+            ORDER BY mirror_id, day ASC");
+        foreach ($stmt as $row) {
+            $map[(int)$row['mirror_id']][$row['day']] = $row;
+        }
+    } catch (Throwable $e) {
+        foreach ($ids as $id) $map[$id] = monitorUptimeSeries($pdo, $id, $days);
+    }
+    return $map;
+}
+
+/** Fetch the newest latency points for every mirror in a single query where window functions are supported. */
+function monitorLatencySeriesMap(PDO $pdo, array $mirrorIds, int $points = 30): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $points = max(1, min(200, $points));
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mirror_id, response_ms, status, checked_at
+            FROM (
+                SELECT mirror_id, response_ms, status, checked_at,
+                       ROW_NUMBER() OVER (PARTITION BY mirror_id ORDER BY id DESC) AS row_num
+                FROM mirror_checks
+                WHERE mirror_id IN ($in) AND response_ms IS NOT NULL AND status IN ('up','slow')
+            ) AS ranked_checks
+            WHERE row_num <= $points
+            ORDER BY mirror_id, checked_at ASC");
+        foreach ($stmt as $row) {
+            $map[(int)$row['mirror_id']][] = [
+                'ms' => (int)$row['response_ms'],
+                'status' => $row['status'],
+                'at' => $row['checked_at'],
+            ];
+        }
+    } catch (Throwable $e) {
+        // Older MySQL/MariaDB versions fall back to the original compatible query.
+        foreach ($ids as $id) $map[$id] = monitorLatencySeries($pdo, $id, $points);
+    }
+    return $map;
+}
+
 /** سری روزانهٔ آپتایم برای نوار ۳۰ روزه */
 function monitorUptimeSeries(PDO $pdo, int $mirrorId, int $days = 30): array {
     try {
