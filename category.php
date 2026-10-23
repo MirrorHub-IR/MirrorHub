@@ -39,14 +39,18 @@ $GLOBALS['pageSeo'] = [
 ];
 $subCategories = getCategories($pdo, $category['id']);
 $mirrors = getMirrorsByCategory($pdo, $category['id']);
-foreach ($mirrors as &$m) {
-    $m['categories'] = getMirrorCategoryTags($pdo, $m['id']);
-        $m['protocols'] = getMirrorProtocols($pdo, $m['id']);
+$mirrorIds = array_column($mirrors, 'id');
+$mirrorCategoryMap = getMirrorCategoryTagsMap($pdo, $mirrorIds);
+$mirrorProtocolMap = getMirrorProtocolsMap($pdo, $mirrorIds);
+foreach ($mirrors as &$mirror) {
+    $id = (int)$mirror['id'];
+    $mirror['categories'] = $mirrorCategoryMap[$id] ?? [];
+    $mirror['protocols'] = $mirrorProtocolMap[$id] ?? [];
 }
-unset($m);
+unset($mirror);
 
 // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
-$monitorStatuses = monitorStatusMap($pdo, array_column($mirrors, 'id'));
+$monitorStatuses = monitorStatusMap($pdo, $mirrorIds);
 
 // راهنماهای منتشرشده‌ای که مستقیماً به همین دستهٔ نرم‌افزاری وصل شده‌اند.
 $relatedGuides = [];
