@@ -68,7 +68,7 @@ function renderHeader($title = '', $isAdmin = false) {
     <?php foreach ($extraStyles as $stylePath): ?>
         <link rel="stylesheet" href="<?= htmlspecialchars(asset((string)$stylePath), ENT_QUOTES, 'UTF-8') ?>">
     <?php endforeach; ?>
-    <link rel="stylesheet" href="<?= htmlspecialchars(asset('css/responsive.css'), ENT_QUOTES, 'UTF-8') ?>">
+
     <link rel="icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="shortcut icon" type="image/png" href="<?= asset('logo.png') ?>">
     <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
