@@ -215,5 +215,5 @@ renderHeader('وضعیت سرورها');
 </section>
 
 <script>window.MH_MONITOR_REFRESH = 60;</script>
-<script src="<?= asset('js/monitor.js') ?>"></script>
+<script src="<?= asset('js/monitor.js') ?>" defer></script>
 <?php renderFooter(); ?>
