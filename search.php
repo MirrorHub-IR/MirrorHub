@@ -23,7 +23,7 @@ if ($terms) {
     $mirrorParts = [];
     $mirrorParams = [];
     foreach ($terms as $term) {
-        $like = '%' . str_replace(['\\\\', '%', '_'], ['\\\\\\\\', '\\\\%', '\\\\_'], $term) . '%';
+        $like = '%' . $term . '%';
         $match = '(m.name_fa LIKE ? OR m.name_en LIKE ? OR m.description LIKE ? OR m.url LIKE ? OR m.protocol LIKE ?
             OR EXISTS (
                 SELECT 1 FROM mirror_categories smc
@@ -70,7 +70,7 @@ if ($terms) {
     $categoryParts = [];
     $categoryParams = [];
     foreach ($terms as $term) {
-        $like = '%' . str_replace(['\\\\', '%', '_'], ['\\\\\\\\', '\\\\%', '\\\\_'], $term) . '%';
+        $like = '%' . $term . '%';
         $categoryParts[] = '(c.name LIKE ? OR c.slug LIKE ? OR c.description LIKE ? OR p.name LIKE ?)';
         array_push($categoryParams, $like, $like, $like, $like);
     }
@@ -90,7 +90,7 @@ if ($terms) {
     $guideParts = [];
     $guideParams = [];
     foreach ($terms as $term) {
-        $like = '%' . str_replace(['\\\\', '%', '_'], ['\\\\\\\\', '\\\\%', '\\\\_'], $term) . '%';
+        $like = '%' . $term . '%';
         $guideParts[] = '(a.title LIKE ? OR a.excerpt LIKE ?)';
         array_push($guideParams, $like, $like);
     }
@@ -106,12 +106,16 @@ if ($terms) {
     $stmt->execute($guideParams);
     $guideResults = $stmt->fetchAll();
 
+    $mirrorIds = array_column($mirrorResults, 'id');
+    $categoryMap = getMirrorCategoryTagsMap($pdo, $mirrorIds);
+    $protocolMap = getMirrorProtocolsMap($pdo, $mirrorIds);
     foreach ($mirrorResults as &$mirror) {
-        $mirror['categories'] = getMirrorCategoryTags($pdo, $mirror['id']);
-        $mirror['protocols'] = getMirrorProtocols($pdo, $mirror['id']);
+        $id = (int)$mirror['id'];
+        $mirror['categories'] = $categoryMap[$id] ?? [];
+        $mirror['protocols'] = $protocolMap[$id] ?? [];
     }
     unset($mirror);
-    $monitorStatuses = monitorStatusMap($pdo, array_column($mirrorResults, 'id'));
+    $monitorStatuses = monitorStatusMap($pdo, $mirrorIds);
 } else {
     $quickCategories = $pdo->query("
         SELECT id, name, slug, type
