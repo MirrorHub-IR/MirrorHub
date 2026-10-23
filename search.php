@@ -33,8 +33,8 @@ renderHeader('جستجو');
 
 <section class="section">
     <h1 class="section-title">جستجوی میرور</h1>
-    <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form large">
-        <input type="text" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="نام، توضیحات یا آدرس میرور..." required autocomplete="off" autofocus>
+    <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form large" role="search" aria-label="جست‌وجوی میرورها">
+        <input type="search" name="q" aria-label="نام، توضیحات یا آدرس میرور" value="<?= htmlspecialchars($query) ?>" placeholder="نام، توضیحات یا آدرس میرور..." required autocomplete="off" autofocus>
         <button type="submit">جستجو</button>
     </form>
 </section>
@@ -46,7 +46,10 @@ renderHeader('جستجو');
         <span class="badge badge-primary"><?= count($results) ?> نتیجه</span>
     </div>
     <?php if (empty($results)): ?>
-        <p class="empty-state">هیچ میروری با این مشخصات یافت نشد.</p>
+        <div class="empty-state">
+            <p>هیچ میروری با این عبارت پیدا نشد. املای نام یا بخشی از آدرس را امتحان کنید.</p>
+            <p><a class="btn btn-outline btn-sm" href="<?= SITE_URL ?>/">مرور دسته‌بندی‌ها</a></p>
+        </div>
     <?php else: ?>
         <div class="grid grid-cols-2">
             <?php foreach ($results as $mirror): ?>
