@@ -339,28 +339,7 @@ function monitorProbeUrl(string $url, float $timeoutSec = 8.0): array {
         }
     }
 
-    /* ۳) اگر خطای گواهی SSL فقط به‌خاطر نبودِ CA bundle در خودِ PHP
-          باشد (رایج روی ویندوز بدون curl.cainfo)، یک بار بدون
-          اعتبارسنجیِ گواهی تلاش می‌کنیم و یادداشت صادقانه می‌زنیم.
-          روی سرورهایی که CA درست دارند، اعتبارسنجی کامل باقی می‌ماند. */
-    $sslVerified = true;
-    if (false && $info['errno'] === CURLE_PEER_FAILED_VERIFICATION && monitorCaBundleMissing()) {
-        $retry = $run([
-            CURLOPT_NOBODY         => false,
-            CURLOPT_TIMEOUT        => (int)ceil($timeoutSec) + 1,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_WRITEFUNCTION  => function ($ch, $chunk) {
-                return 0;
-            },
-        ]);
-        if ($retry['errno'] === CURLE_WRITE_ERROR || $retry['http_code'] > 0) {
-            $retry['errno'] = ($retry['errno'] === CURLE_WRITE_ERROR) ? 0 : $retry['errno'];
-            $retry['error'] = '';
-            $info = $retry;
-            $sslVerified = false;
-        }
-    }
+    /* گواهی TLS هرگز دور زده نمی‌شود؛ خطای CA باید به‌عنوان خطای محیط پایشگر دیده شود. */
 
     $result['http_code']    = $info['http_code'];
     $result['redirects']    = $info['redirects'];
@@ -893,7 +872,7 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         if ((int)$settings['enabled'] !== 1) return;
         if (!ensureMonitorSchema($pdo)) return;
 
-        $intervalH = (float)$settings['interval_hours'];
+        $intervalH = (float)($settings['interval_hours'] ?? 1);
         if ($intervalH <= 0) $intervalH = MONITOR_DEFAULT_CRON_HOURS;
 
         $now = time();
@@ -901,7 +880,8 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         $lastTry = !empty($settings['last_attempt_at']) ? strtotime($settings['last_attempt_at']) : false;
 
         if ($lastRun !== false && ($now - $lastRun) < $intervalH * 3600) return;
-        if ($lastTry !== false && ($now - $lastTry) < 3600) return; // حداکثر یک تلاش در ساعت
+        $attemptCooldown = max(300, min(3600, (int)round($intervalH * 3600)));
+        if ($lastTry !== false && ($now - $lastTry) < $attemptCooldown) return; // جلوگیری از اجرای مکرر در بازدیدهای پرتعداد
 
         $pdo->prepare("INSERT INTO monitor_settings (skey, svalue) VALUES ('last_attempt_at', ?)
             ON DUPLICATE KEY UPDATE svalue = VALUES(svalue)")->execute([date('Y-m-d H:i:s')]);
