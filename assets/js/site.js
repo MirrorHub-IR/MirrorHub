@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.key === 'Escape') closeMenu();
         });
         window.addEventListener('resize', () => {
-            if (window.innerWidth > 760) closeMenu();
+            const adminBreakpoint = document.body.classList.contains('admin-layout') ? 1160 : 900;
+            if (window.innerWidth > adminBreakpoint) closeMenu();
         }, { passive: true });
     }
 
