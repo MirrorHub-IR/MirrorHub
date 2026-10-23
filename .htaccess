@@ -3,3 +3,4 @@ RewriteEngine On
 RewriteRule ^guides/?$ docs.php [L,QSA]
 RewriteRule ^guides/([^/]+)/?$ docs.php?slug=$1 [L,QSA,B]
 RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^robots\.txt$ robots.php [L]
