@@ -62,6 +62,8 @@ function monitorDefaults(): array {
         'last_run_ms'         => '0',
         'last_run_checked'    => '0',
         'last_attempt_at'     => '',
+        'previous_cron_run_at'=> '',
+        'last_cron_run_at'    => '',
         'cron_key'            => '',      // کلید دسترسی endpoint زمان‌بند وب
     ];
 }
@@ -105,6 +107,16 @@ function monitorSaveSettings(PDO $pdo, array $values): void {
 function monitorSettingsReset(): void {
     // تازه‌سازی کشِ داخلِ همان درخواست، پس از ذخیرهٔ تنظیمات
     unset($GLOBALS['__mh_monitor_settings']);
+}
+
+/** ثبت زمان اجرای واقعی cron بیرونی؛ برای نمایش زمان‌بندی مشاهده‌شده در صفحهٔ عمومی */
+function monitorRecordCronInvocation(PDO $pdo): void {
+    $settings = monitorSettings($pdo);
+    $previous = trim((string)($settings['last_cron_run_at'] ?? ''));
+    monitorSaveSettings($pdo, [
+        'previous_cron_run_at' => $previous,
+        'last_cron_run_at' => date('Y-m-d H:i:s'),
+    ]);
 }
 
 /* کلید cron وب (برای فراخوانی cron.php از سرویس‌های web-cron) */
@@ -926,6 +938,8 @@ function monitorStatusSummary(PDO $pdo): array {
         'mirrors' => 0, 'up' => 0, 'slow' => 0, 'down' => 0, 'unknown' => 0,
         'avg_response_ms' => null, 'uptime_percent' => null,
         'last_run_at' => null, 'last_run_ms' => 0, 'last_run_checked' => 0,
+        'last_cron_run_at' => null, 'previous_cron_run_at' => null,
+        'observed_cron_interval_seconds' => null,
         'open_incidents' => 0, 'total_checks' => 0,
     ];
     try {
@@ -966,6 +980,15 @@ function monitorStatusSummary(PDO $pdo): array {
         $out['last_run_checked'] = (int)$settings['last_run_checked'];
         $out['enabled'] = (int)$settings['enabled'] === 1;
         $out['interval_hours'] = (float)$settings['interval_hours'];
+        $out['last_cron_run_at'] = $settings['last_cron_run_at'] ?: null;
+        $out['previous_cron_run_at'] = $settings['previous_cron_run_at'] ?: null;
+        if (!empty($out['last_cron_run_at']) && !empty($out['previous_cron_run_at'])) {
+            $lastCronTs = strtotime((string)$out['last_cron_run_at']);
+            $previousCronTs = strtotime((string)$out['previous_cron_run_at']);
+            if ($lastCronTs !== false && $previousCronTs !== false && $lastCronTs > $previousCronTs) {
+                $out['observed_cron_interval_seconds'] = $lastCronTs - $previousCronTs;
+            }
+        }
     } catch (Throwable $e) {
     }
     return $out;
