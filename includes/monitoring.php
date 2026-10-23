@@ -804,25 +804,28 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
 function monitorNotify(array $settings, string $text): bool {
     $delivered = false;
 
-    if (!empty($settings['telegram_bot_token']) && !empty($settings['telegram_chat_id'])) {
-        $ok = false;
-        if (function_exists('curl_init')) {
-            $ch = curl_init('https://api.telegram.org/bot' . $settings['telegram_bot_token'] . '/sendMessage');
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => http_build_query([
-                    'chat_id' => $settings['telegram_chat_id'],
-                    'text'    => $text,
-                ]),
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-            ]);
-            $resp = curl_exec($ch);
-            curl_close($ch);
-            $json = json_decode((string)$resp, true);
-            $ok = is_array($json) && !empty($json['ok']);
+    if (!empty($settings['bale_bot_token']) && !empty($settings['bale_chat_id']) && function_exists('curl_init')) {
+        $token = trim((string)$settings['bale_bot_token']);
+        $chatId = trim((string)$settings['bale_chat_id']);
+        // Bale Bot API follows the sendMessage method and JSON ok/error response pattern.
+        $endpoint = 'https://tapi.bale.ai/bot' . rawurlencode($token) . '/sendMessage';
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => http_build_query(['chat_id' => $chatId, 'text' => mb_substr($text, 0, 4000)]),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $json = json_decode((string)$resp, true);
+        if ($resp !== false && $code >= 200 && $code < 300 && is_array($json) && !empty($json['ok'])) {
+            $delivered = true;
         }
-        if ($ok) $delivered = true;
     }
 
     if (!empty($settings['webhook_url']) && filter_var($settings['webhook_url'], FILTER_VALIDATE_URL)) {
