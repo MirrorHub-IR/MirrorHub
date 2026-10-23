@@ -24,6 +24,16 @@ unset($m);
 // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
 $monitorStatuses = monitorStatusMap($pdo, array_column($mirrors, 'id'));
 
+// راهنماهای منتشرشده‌ای که مستقیماً به همین دستهٔ نرم‌افزاری وصل شده‌اند.
+$relatedGuides = [];
+if (($category['type'] ?? '') === 'software') {
+    $guideQuery = $pdo->prepare("SELECT title, slug, excerpt, published_at FROM cms_articles
+        WHERE category_id = ? AND status = 'published'
+        ORDER BY COALESCE(published_at, created_at) DESC, id DESC");
+    $guideQuery->execute([(int)$category['id']]);
+    $relatedGuides = $guideQuery->fetchAll();
+}
+
 renderHeader($category['name']);
 ?>
 
@@ -48,6 +58,28 @@ renderHeader($category['name']);
         <p class="category-desc"><?= htmlspecialchars($category['description']) ?></p>
     <?php endif; ?>
 </section>
+
+<?php if (!empty($relatedGuides)): ?>
+<link rel="stylesheet" href="<?= asset('css/cms.css') ?>">
+<section class="section">
+    <div class="section-header">
+        <h2 class="section-title">راهنماهای مرتبط با <?= htmlspecialchars($category['name']) ?></h2>
+        <span class="badge badge-primary"><?= count($relatedGuides) ?> راهنما</span>
+    </div>
+    <div class="cms-article-grid">
+        <?php foreach ($relatedGuides as $guide): ?>
+            <article class="cms-article-card">
+                <?php if (!empty($guide['published_at'])): ?>
+                    <div class="cms-article-meta"><time><?= htmlspecialchars(date('Y/m/d', strtotime($guide['published_at']))) ?></time></div>
+                <?php endif; ?>
+                <h3><a href="<?= SITE_URL ?>/guides/<?= rawurlencode($guide['slug']) ?>"><?= htmlspecialchars($guide['title']) ?></a></h3>
+                <?php if (!empty($guide['excerpt'])): ?><p><?= htmlspecialchars($guide['excerpt']) ?></p><?php endif; ?>
+                <a class="cms-read-more" href="<?= SITE_URL ?>/guides/<?= rawurlencode($guide['slug']) ?>">مطالعه راهنما ←</a>
+            </article>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endif; ?>
 
 <?php if (!empty($subCategories)): ?>
 <section class="section">
