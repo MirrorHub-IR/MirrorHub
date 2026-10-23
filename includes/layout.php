@@ -12,15 +12,21 @@ function renderHeader($title = '', $isAdmin = false) {
     $metaTitle = trim((string)($seo['title'] ?? ''));
     $pageTitle = $metaTitle !== '' ? $metaTitle : ($title ? "$title | $siteName" : $siteName);
     $metaDescription = trim((string)($seo['description'] ?? ''));
-    if ($metaDescription === '') $metaDescription = "$siteName - مخزن میرورهای نرم‌افزاری";
     $currentPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
-    $canonicalUrl = trim((string)($seo['canonical'] ?? ''));
-    if ($canonicalUrl === '' && !$isAdmin && $currentPage !== 'search.php') {
-        $canonicalPath = ($currentPage === 'index.php' || $currentPage === '') ? '' : rawurlencode($currentPage);
-        $canonicalUrl = rtrim(SITE_URL, '/') . '/' . $canonicalPath;
+    if ($metaDescription === '') {
+        $metaDescription = $title !== ''
+            ? $title . ' در ' . $siteName . '؛ فهرست میرورهای نرم‌افزاری و وضعیت آن‌ها.'
+            : $siteName . '؛ فهرست میرورهای نرم‌افزاری و راهنماهای استفاده از مخازن.';
     }
     $robotsContent = trim((string)($seo['robots'] ?? 'index,follow'));
     if ($isAdmin) $robotsContent = 'noindex,nofollow';
+    $canonicalUrl = trim((string)($seo['canonical'] ?? ''));
+    $responseCode = http_response_code();
+    $isNoindex = stripos($robotsContent, 'noindex') !== false;
+    if ($canonicalUrl === '' && !$isAdmin && $currentPage !== 'search.php' && !$isNoindex && $responseCode !== 404) {
+        $canonicalPath = ($currentPage === 'index.php' || $currentPage === '') ? '' : rawurlencode($currentPage);
+        $canonicalUrl = rtrim(SITE_URL, '/') . '/' . $canonicalPath;
+    }
     $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
     $structuredData = [[
         '@context' => 'https://schema.org',
