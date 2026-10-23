@@ -498,10 +498,15 @@ function getRecentMirrors($pdo, $limit = 12) {
     $stmt = $pdo->prepare("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT $limit");
     $stmt->execute();
     $mirrors = $stmt->fetchAll();
-    foreach ($mirrors as &$m) {
-        $m['categories'] = getMirrorCategories($pdo, $m['id']);
-        $m['protocols'] = getMirrorProtocols($pdo, $m['id']);
+    $ids = array_column($mirrors, 'id');
+    $categories = getMirrorCategoryTagsMap($pdo, $ids);
+    $protocols = getMirrorProtocolsMap($pdo, $ids);
+    foreach ($mirrors as &$mirror) {
+        $id = (int)$mirror['id'];
+        $mirror['categories'] = $categories[$id] ?? [];
+        $mirror['protocols'] = $protocols[$id] ?? [];
     }
+    unset($mirror);
     return $mirrors;
 }
 
