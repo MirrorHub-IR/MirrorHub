@@ -174,9 +174,21 @@ function renderFooter() {
         </div>
     </footer>
 
-    <script>window.MH_SITE_URL = <?= json_encode(SITE_URL) ?>;</script>
-    <script src="<?= asset('js/app.js') ?>"></script>
-    <script src="<?= asset('js/ping.js') ?>"></script>
+    <?php
+        $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        $adminRoute = strpos((string)($_SERVER['SCRIPT_NAME'] ?? ''), '/admin/') !== false;
+        $needsAdminInteractions = $adminRoute && $scriptName !== 'login.php';
+        $needsSuggestionInteractions = $scriptName === 'suggest.php';
+        $needsPing = in_array($scriptName, ['index.php', 'search.php', 'category.php', 'mirrors.php'], true);
+    ?>
+    <script>window.MH_SITE_URL = <?= json_encode(SITE_URL, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
+    <script src="<?= asset('js/site.js') ?>" defer></script>
+    <?php if ($needsAdminInteractions || $needsSuggestionInteractions): ?>
+        <script src="<?= asset('js/app.js') ?>" defer></script>
+    <?php endif; ?>
+    <?php if ($needsPing): ?>
+        <script src="<?= asset('js/ping.js') ?>" defer></script>
+    <?php endif; ?>
 </body>
 </html>
 <?php
