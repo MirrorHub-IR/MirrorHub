@@ -44,13 +44,9 @@ renderHeader('وضعیت سرورها');
                     — <?= monitorFa($summary['last_run_checked']) ?> میرور بررسی شد
                 <?php endif; ?>
                 <?php if ($summary['enabled']): ?>
-                    <?php if (!empty($summary['observed_cron_interval_seconds'])): ?>
-                        — فاصلهٔ واقعی بین دو اجرای اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>
-                        — آخرین اجرای Cron: <?= monitorTimeAgoFa($summary['last_cron_run_at'] ?? null) ?>
-                    <?php elseif (!empty($summary['last_cron_run_at'])): ?>
-                        — آخرین اجرای Cron: <strong><?= monitorTimeAgoFa($summary['last_cron_run_at']) ?></strong>؛ برای محاسبهٔ فاصله، یک اجرای دیگر لازم است.
-                    <?php else: ?>
-                        — زمان‌بندی واقعی Cron هنوز ثبت نشده است.
+                    — بازهٔ پایش خودکار: <strong><?= htmlspecialchars(monitorIntervalLabel(monitorConfiguredIntervalHours($summary))) ?></strong>
+                    <?php if (!empty($summary['last_cron_run_at'])): ?>
+                        — آخرین فراخوانی زمان‌بند: <?= monitorTimeAgoFa($summary['last_cron_run_at']) ?>
                     <?php endif; ?>
                 <?php else: ?>
                     — <strong class="mon-warn-text">پایش خودکار در تنظیمات غیرفعال است</strong>
