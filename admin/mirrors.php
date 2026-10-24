@@ -26,6 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $url = filter_var(trim($_POST['url'] ?? ''), FILTER_SANITIZE_URL);
     $protocols = normalizeProtocols($_POST['protocols'] ?? [], $_POST['custom_protocols'] ?? []);
     $protocol = $protocols[0]['protocol'] ?? 'https';
+    $healthProfile = trim((string)($_POST['health_profile'] ?? 'http_only'));
+    $healthPath = trim((string)($_POST['health_path'] ?? ''));
+    $healthMaxAgeHours = (int)($_POST['health_max_age_hours'] ?? 168);
     $description = sanitize($_POST['description'] ?? '');
     $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
     $category_ids = array_filter(array_map('intval', $_POST['category_ids'] ?? []), fn($v) => $v > 0);
@@ -43,6 +46,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($backUrl);
     }
 
+    $healthProfiles = monitorRepositoryHealthProfiles();
+    if (!isset($healthProfiles[$healthProfile])) {
+        flash('error', 'پروفایل سلامت مخزن معتبر نیست.');
+        redirect($backUrl);
+    }
+    if ($healthMaxAgeHours < 1 || $healthMaxAgeHours > 720) {
+        flash('error', 'حداکثر سن metadata باید بین ۱ تا ۷۲۰ ساعت باشد.');
+        redirect($backUrl);
+    }
+    $normalizedHealthPath = monitorNormalizeRepositoryPath($healthProfile, $healthPath);
+    if (!$normalizedHealthPath['valid']) {
+        flash('error', (string)$normalizedHealthPath['error']);
+        redirect($backUrl);
+    }
+
     if (empty($slug)) {
         $slug = slugify($name_en ?: $name_fa);
     }
@@ -53,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([$name_fa, $name_en, $slug, $url, $protocol, $description, $status, $id]);
             setMirrorCategories($pdo, $id, $category_ids);
             setMirrorProtocols($pdo, $id, $protocols);
+            monitorSaveRepositoryHealthConfig($pdo, $id, $healthProfile, $normalizedHealthPath['path'], $healthMaxAgeHours);
             flash('success', 'میرور با موفقیت ویرایش شد.');
         } else {
             $pdo->prepare("INSERT INTO mirrors (name_fa, name_en, slug, url, protocol, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -60,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newId = (int)$pdo->lastInsertId();
             setMirrorCategories($pdo, $newId, $category_ids);
             setMirrorProtocols($pdo, $newId, $protocols);
+            monitorSaveRepositoryHealthConfig($pdo, $newId, $healthProfile, $normalizedHealthPath['path'], $healthMaxAgeHours);
 
             if ($linkRequestId > 0) {
                 $pdo->prepare("UPDATE requests SET mirror_id = ?, status='reviewed', reviewed_by=?, reviewed_at=NOW() WHERE id = ?")
@@ -101,6 +121,11 @@ if ($action === 'edit' && $id) {
     $currentCatIds = array_map(fn($c) => (int)$c['id'], getMirrorCategories($pdo, $id));
     $currentProtocols = getMirrorProtocols($pdo, $id);
 }
+$healthProfiles = monitorRepositoryHealthProfiles();
+$currentHealthConfig = $action === 'edit' && $id > 0
+    ? monitorRepositoryHealthConfig($pdo, $id)
+    : ['profile' => 'http_only', 'metadata_path' => '', 'max_age_hours' => 168];
+$currentHealthProfileInfo = $healthProfiles[$currentHealthConfig['profile']] ?? $healthProfiles['http_only'];
 
 $prefill = [];
 $prefillRequestId = 0;
@@ -385,6 +410,38 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                             <div class="mirror-card-head">
                                 <div class="mirror-card-step">۴</div>
                                 <div>
+                                    <h2>سلامت محتوای مخزن</h2>
+                                    <p>بررسی مستقل metadata، جدا از پاسخ HTTP آدرس اصلی.</p>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="health_profile">پروفایل بررسی محتوا</label>
+                                <select id="health_profile" name="health_profile">
+                                    <?php foreach ($healthProfiles as $profileKey => $profileInfo): ?>
+                                        <option value="<?= htmlspecialchars($profileKey) ?>" <?= $currentHealthConfig['profile'] === $profileKey ? 'selected' : '' ?>><?= htmlspecialchars($profileInfo['label']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="form-hint">«فقط HTTP» مانند قبل تنها آدرس اصلی را می‌سنجد. پروفایل‌های دیگر یک فایل مشخص از مخزن را بررسی می‌کنند.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="health_path">مسیر نسبی فایل metadata</label>
+                                <input type="text" id="health_path" name="health_path" dir="ltr" maxlength="500"
+                                    value="<?= htmlspecialchars($currentHealthConfig['metadata_path']) ?>"
+                                    placeholder="<?= htmlspecialchars($currentHealthProfileInfo['default_path']) ?>" autocomplete="off">
+                                <small class="form-hint">مسیر نسبت به URL اصلی میرور است. اگر خالی باشد، مسیر پیش‌فرض پروفایل استفاده می‌شود؛ برای نسخه یا معماری متفاوت آن را تغییر دهید.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="health_max_age_hours">حداکثر سن مجاز metadata (ساعت)</label>
+                                <input type="number" id="health_max_age_hours" name="health_max_age_hours" min="1" max="720" required
+                                    value="<?= (int)$currentHealthConfig['max_age_hours'] ?>">
+                                <small class="form-hint">پیش‌فرض ۱۶۸ ساعت (۷ روز) است و فقط برای فایل‌هایی اعمال می‌شود که تاریخ قابل‌استخراج دارند.</small>
+                            </div>
+                        </section>
+
+                        <section class="mirror-editor-card">
+                            <div class="mirror-card-head">
+                                <div class="mirror-card-step">۵</div>
+                                <div>
                                     <h2>توضیحات</h2>
                                     <p>اطلاعات تکمیلی که به شناخت بهتر میرور کمک می‌کند.</p>
                                 </div>
@@ -403,6 +460,7 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                                 <span class="mirror-submit-check"><span></span> آدرس</span>
                                 <span class="mirror-submit-check"><span></span> پروتکل</span>
                                 <span class="mirror-submit-check"><span></span> دسته‌بندی</span>
+                                <span class="mirror-submit-check"><span></span> سلامت محتوا (اختیاری)</span>
                             </div>
                             <div class="mirror-submit-actions">
                                 <a href="<?= SITE_URL ?>/admin/mirrors.php" class="btn btn-outline">انصراف</a>
