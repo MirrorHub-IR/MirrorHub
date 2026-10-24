@@ -175,7 +175,7 @@ function monitorPersistRepositoryHealth(PDO $pdo,int $mirrorId,array $result): v
 }
 
 function monitorRepositoryHealthStatusFa(string $status): string {
-    return match($status) {'healthy'=>'محتوا سالم','stale'=>'محتوا قدیمی','invalid'=>'metadata نامعتبر',
+    return match($status) {'healthy'=>'metadata به‌روز','stale'=>'metadata قدیمی','invalid'=>'metadata نامعتبر',
        'error'=>'خطای بررسی محتوا','not_configured'=>'فقط HTTP',default=>'نامشخص'};
 }
 
