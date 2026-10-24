@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/jalali.php';
+require_once __DIR__ . '/repository-health.php';
 
 /* ============================================================
    MirrorHub — سامانه پایش میرورها (Server-side Monitoring)
@@ -20,7 +21,7 @@ require_once __DIR__ . '/jalali.php';
      (در صورت نبود cron) — توضیح کامل در docs/monitoring.md
    ============================================================ */
 
-const MONITOR_SCHEMA_VERSION = 1;
+const MONITOR_SCHEMA_VERSION = 2;
 const MONITOR_DEFAULT_CRON_HOURS = 1;
 
 /* برخی بیلدهای PHP (به‌خصوص روی ویندوز) ثابت‌های خطای cURL را
@@ -245,6 +246,25 @@ function monitorTableDDL(): array {
             `skey` VARCHAR(50) PRIMARY KEY,
             `svalue` TEXT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS `mirror_repository_health` (
+            `mirror_id` INT NOT NULL PRIMARY KEY,
+            `profile` VARCHAR(32) NOT NULL DEFAULT 'http_only',
+            `metadata_path` VARCHAR(500) DEFAULT NULL,
+            `max_age_hours` SMALLINT UNSIGNED NOT NULL DEFAULT 168,
+            `status` ENUM('not_configured','healthy','stale','invalid','error','unknown') NOT NULL DEFAULT 'not_configured',
+            `last_checked_at` DATETIME DEFAULT NULL,
+            `http_code` SMALLINT UNSIGNED DEFAULT NULL,
+            `response_ms` INT UNSIGNED DEFAULT NULL,
+            `last_modified_at` DATETIME DEFAULT NULL,
+            `metadata_date` DATETIME DEFAULT NULL,
+            `age_seconds` BIGINT UNSIGNED DEFAULT NULL,
+            `checked_url` VARCHAR(1000) DEFAULT NULL,
+            `content_type` VARCHAR(255) DEFAULT NULL,
+            `message` VARCHAR(500) DEFAULT NULL,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY `idx_repo_health_status_checked` (`status`, `last_checked_at`),
+            FOREIGN KEY (`mirror_id`) REFERENCES `mirrors`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
     ];
 }
 
@@ -256,7 +276,7 @@ function ensureMonitorSchema(PDO $pdo): bool {
     static $done = false;
     if ($done) return true;
 
-    $required = ['mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings'];
+    $required = ['mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'];
     try {
         $existing = [];
         foreach ($pdo->query("SHOW TABLES") as $row) {
@@ -540,6 +560,8 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
         'slow'     => 0,
         'down'     => 0,
         'skipped_targets' => 0,
+        'repository_checks' => 0, 'repository_healthy' => 0, 'repository_stale' => 0,
+        'repository_invalid' => 0, 'repository_error' => 0, 'repository_unknown' => 0,
         'alerts'   => 0,
         'duration_ms' => 0,
     ];
@@ -600,13 +622,17 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
 
         // فقط میرورهایی که به حداقل یک دستهٔ «ارائه‌دهنده» وصل‌اند پایش می‌شوند.
         // ترتیب بر اساس قدیمی‌ترین بررسی باعث می‌شود فهرست بزرگ‌تر از batch_limit هم در چرخه‌های بعدی نوبت بگیرد.
-        $mirrors = $pdo->prepare("SELECT m.id, m.name_fa, m.name_en, m.url
+        $mirrors = $pdo->prepare("SELECT m.id, m.name_fa, m.name_en, m.url,
+                    COALESCE(rh.profile, 'http_only') AS health_profile,
+                    COALESCE(rh.metadata_path, '') AS health_path,
+                    COALESCE(rh.max_age_hours, 168) AS health_max_age_hours
             FROM mirrors m
             INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
             LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+            LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
             WHERE m.status = 'active'
-            GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at
+            GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at, rh.profile, rh.metadata_path, rh.max_age_hours
             ORDER BY COALESCE(ms.last_checked_at, '1970-01-01 00:00:00') ASC, m.id ASC LIMIT $limit");
         $mirrors->execute();
         $mirrors = $mirrors->fetchAll();
@@ -725,6 +751,19 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
 
             /* ثبت رخداد (قطعی) */
             monitorSyncIncident($pdo, (int)$mirror['id'], $status, $note);
+
+            /* Content health is independent of HTTP reachability and does not alter uptime. */
+            $healthProfile = (string)($mirror['health_profile'] ?? 'http_only');
+            if ($healthProfile !== 'http_only' && isset(monitorRepositoryHealthProfiles()[$healthProfile])) {
+                $healthResult = monitorCheckRepositoryHealth(
+                    $url, $healthProfile, (string)($mirror['health_path'] ?? ''),
+                    (int)($mirror['health_max_age_hours'] ?? 168)
+                );
+                monitorPersistRepositoryHealth($pdo, (int)$mirror['id'], $healthResult);
+                $out['repository_checks']++;
+                $healthKey = 'repository_' . (string)($healthResult['status'] ?? 'unknown');
+                if (array_key_exists($healthKey, $out)) $out[$healthKey]++;
+            }
 
             /* تغییر وضعیت → هشدار */
             if ($prevStatus !== 'unknown' && $prevStatus !== $status) {
@@ -1058,13 +1097,25 @@ function monitorMirrorRows(PDO $pdo): array {
         $stmt = $pdo->query("SELECT m.id, m.name_fa, m.name_en, m.slug, m.url,
                     COALESCE(ms.status, 'unknown') AS status,
                     ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
-                    ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
+                    ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total,
+                    COALESCE(rh.profile, 'http_only') AS repository_health_profile,
+                    COALESCE(rh.status, 'not_configured') AS repository_health_status,
+                    rh.last_checked_at AS repository_health_checked_at, rh.metadata_path AS repository_metadata_path,
+                    rh.max_age_hours AS repository_max_age_hours, rh.http_code AS repository_health_http_code,
+                    rh.response_ms AS repository_health_response_ms, rh.last_modified_at AS repository_last_modified_at,
+                    rh.metadata_date AS repository_metadata_date, rh.age_seconds AS repository_age_seconds,
+                    rh.message AS repository_health_message, rh.checked_url AS repository_checked_url
                 FROM mirrors m
                 INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
                 INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
                 LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
+                LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
                 WHERE m.status = 'active'
-                GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url, ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error, ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total
+                GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url,
+                    ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
+                    ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total,
+                    rh.profile, rh.status, rh.last_checked_at, rh.metadata_path, rh.max_age_hours, rh.http_code,
+                    rh.response_ms, rh.last_modified_at, rh.metadata_date, rh.age_seconds, rh.message, rh.checked_url
                 ORDER BY FIELD(COALESCE(ms.status, 'unknown'), 'down', 'slow', 'unknown', 'up'), m.name_fa ASC");
         return $stmt->fetchAll();
     } catch (Throwable $e) {
