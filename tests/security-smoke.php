@@ -10,6 +10,10 @@ $assert = static function (bool $condition, string $message) use (&$failures): v
 $config = file_get_contents($root . '/config.php') ?: '';
 $installer = file_get_contents($root . '/install.php') ?: '';
 $backup = file_get_contents($root . '/admin/backup.php') ?: '';
+$mirrorDetail = file_get_contents($root . '/mirror.php') ?: '';
+$searchPage = file_get_contents($root . '/search.php') ?: '';
+$homePage = file_get_contents($root . '/index.php') ?: '';
+$categoryPage = file_get_contents($root . '/category.php') ?: '';
 $monitoring = file_get_contents($root . '/includes/monitoring.php') ?: '';
 $repoHealth = file_get_contents($root . '/includes/repository-health.php') ?: '';
 $ignore = file_get_contents($root . '/.gitignore') ?: '';
@@ -42,6 +46,14 @@ $assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 3'), 'Backup format ve
 $assert(str_contains($backup, 'legacyMissingTables'), 'Legacy backup safety guard is missing.');
 $assert(str_contains($monitoring, 'mirror_repository_health'), 'Repository-health schema is missing.');
 $assert(str_contains($repoHealth, 'function monitorEvaluateRepositoryHealth'), 'Repository-health evaluator is missing.');
+$assert(str_contains($mirrorDetail, 'repo-config-data'), 'Mirror detail page must provide repository configuration templates.');
+$assert(str_contains($mirrorDetail, 'mirror_checks'), 'Mirror detail page must show recent HTTP checks.');
+$assert(str_contains($mirrorDetail, 'gpgcheck=1'), 'RPM template must keep signature checking enabled.');
+$assert(str_contains($searchPage, 'mirror_repository_health'), 'Search filters must include repository metadata health.');
+$assert(str_contains($searchPage, 'filterCategoryId'), 'Search filters must support categories.');
+$assert(str_contains($searchPage, 'mirror.php?slug='), 'Search results must link to mirror detail pages.');
+$assert(str_contains($homePage, 'mirror.php?slug='), 'Home mirror cards must link to mirror detail pages.');
+$assert(str_contains($categoryPage, 'mirror.php?slug='), 'Category mirror cards must link to mirror detail pages.');
 
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';

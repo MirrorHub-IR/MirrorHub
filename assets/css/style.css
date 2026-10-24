@@ -4379,3 +4379,43 @@ table { max-width: 100%; }
         scroll-behavior: auto !important;
     }
 }
+
+
+/* ============ Stage 3: mirror detail and discovery filters ============ */
+.mirror-filter-form { margin: 1.1rem 0 1.8rem; padding: 1.15rem; border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: var(--radius-lg); }
+.mirror-filter-title h2 { font-size: 1rem; margin-bottom: .2rem; }
+.mirror-filter-title p { color: var(--text-muted); font-size: .84rem; }
+.mirror-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; margin-top: .95rem; }
+.mirror-filter-grid label { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; color: var(--text-secondary); }
+.mirror-filter-grid select { min-width: 0; width: 100%; padding: .7rem .75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); color: var(--text-primary); background: var(--bg-tertiary); font: inherit; }
+.mirror-filter-grid select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mirror-filter-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem; }
+.mirror-filter-actions .btn { min-height: 42px; }
+.mirror-detail-intro { display: flex; flex-direction: column; gap: .7rem; }
+.mirror-detail-url { display: block; padding: .85rem 1rem; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-tertiary); color: var(--accent); overflow-wrap: anywhere; text-align: left; direction: ltr; font-family: 'Consolas', monospace; font-size: .9rem; }
+.mirror-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.mirror-detail-panel { min-width: 0; }
+.mirror-detail-panel .section-title { font-size: 1.05rem; }
+.mirror-detail-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.mirror-detail-stat { padding: .85rem; border: 1px solid var(--border-soft); background: var(--bg-secondary); border-radius: var(--radius); }
+.mirror-detail-stat small { display: block; color: var(--text-muted); font-size: .78rem; margin-bottom: .25rem; }
+.mirror-detail-stat strong { display: block; overflow-wrap: anywhere; font-size: 1rem; }
+.repo-config-panel { overflow: hidden; }
+.repo-config-controls { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.repo-config-controls label { display: flex; flex-direction: column; gap: .35rem; flex: 1 1 15rem; color: var(--text-secondary); font-size: .85rem; }
+.repo-config-controls select { width: 100%; padding: .7rem; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font: inherit; }
+.repo-config-output { margin: 0; padding: 1rem; color: var(--text-primary); background: #090d0b; border: 1px solid var(--border-color); border-radius: var(--radius); overflow: auto; white-space: pre; direction: ltr; text-align: left; font: .85rem/1.75 'Consolas', 'Liberation Mono', monospace; }
+.repo-config-note { color: var(--text-muted); font-size: .83rem; margin-top: .8rem; line-height: 1.8; }
+.mirror-history-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.mirror-history-table th, .mirror-history-table td { padding: .7rem .6rem; border-bottom: 1px solid var(--border-soft); text-align: right; vertical-align: top; }
+.mirror-history-table th { color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+.mirror-history-table td { overflow-wrap: anywhere; }
+.mirror-history-wrap { overflow-x: auto; }
+.mirror-detail-backlinks { display: flex; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 920px) { .mirror-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) {
+    .mirror-filter-grid, .mirror-detail-grid { grid-template-columns: 1fr; }
+    .mirror-detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mirror-history-table th, .mirror-history-table td { padding: .6rem .45rem; }
+    .repo-config-controls { align-items: stretch; }
+}

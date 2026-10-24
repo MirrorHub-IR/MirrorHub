@@ -16,6 +16,48 @@ $quickCategories = [];
 $monitorStatuses = [];
 $hasProtocolTable = hasTable($pdo, 'mirror_protocols');
 
+$filterStatusOptions = ['up', 'slow', 'down', 'unknown'];
+$filterHealthOptions = ['healthy', 'stale', 'invalid', 'error', 'unknown', 'not_configured'];
+$filterStatus = in_array((string)($_GET['status'] ?? ''), $filterStatusOptions, true) ? (string)$_GET['status'] : '';
+$filterProtocol = array_key_exists((string)($_GET['protocol'] ?? ''), getProtocolOptions()) ? (string)$_GET['protocol'] : '';
+$filterCategoryId = (isset($_GET['category_id']) && ctype_digit((string)$_GET['category_id']) && (int)$_GET['category_id'] > 0) ? (int)$_GET['category_id'] : 0;
+$filterRepoHealth = in_array((string)($_GET['repo_health'] ?? ''), $filterHealthOptions, true) ? (string)$_GET['repo_health'] : '';
+$filtersApplied = $filterStatus !== '' || $filterProtocol !== '' || $filterCategoryId > 0 || $filterRepoHealth !== '';
+$filterCategories = $pdo->query("SELECT id, name, type FROM categories ORDER BY CASE WHEN type = 'software' THEN 0 ELSE 1 END, sort_order ASC, name ASC")->fetchAll();
+
+$filterConditions = [];
+$filterParams = [];
+if ($filterStatus !== '') {
+    $filterConditions[] = "COALESCE((SELECT fs.status FROM mirror_status fs WHERE fs.mirror_id = m.id), 'unknown') = ?";
+    $filterParams[] = $filterStatus;
+}
+if ($filterProtocol !== '') {
+    if ($hasProtocolTable) {
+        if ($filterProtocol === 'custom') {
+            $filterConditions[] = "(EXISTS (SELECT 1 FROM mirror_protocols fp WHERE fp.mirror_id = m.id AND fp.protocol = 'custom')
+                OR (NOT EXISTS (SELECT 1 FROM mirror_protocols fp0 WHERE fp0.mirror_id = m.id) AND m.protocol IN ('custom','other')))";
+        } else {
+            $filterConditions[] = "(EXISTS (SELECT 1 FROM mirror_protocols fp WHERE fp.mirror_id = m.id AND fp.protocol = ?)
+                OR (NOT EXISTS (SELECT 1 FROM mirror_protocols fp0 WHERE fp0.mirror_id = m.id) AND m.protocol = ?))";
+            $filterParams[] = $filterProtocol;
+            $filterParams[] = $filterProtocol;
+        }
+    } elseif ($filterProtocol === 'custom') {
+        $filterConditions[] = "m.protocol IN ('custom','other')";
+    } else {
+        $filterConditions[] = "m.protocol = ?";
+        $filterParams[] = $filterProtocol;
+    }
+}
+if ($filterCategoryId > 0) {
+    $filterConditions[] = "EXISTS (SELECT 1 FROM mirror_categories fmc WHERE fmc.mirror_id = m.id AND fmc.category_id = ?)";
+    $filterParams[] = $filterCategoryId;
+}
+if ($filterRepoHealth !== '') {
+    $filterConditions[] = "COALESCE((SELECT frh.status FROM mirror_repository_health frh WHERE frh.mirror_id = m.id), 'not_configured') = ?";
+    $filterParams[] = $filterRepoHealth;
+}
+
 if ($terms) {
     /*
      * All terms must match, but each term may match any useful mirror field.
@@ -48,6 +90,7 @@ if ($terms) {
         $mirrorParts[] = $match;
     }
 
+    $mirrorParams = array_merge($mirrorParams, $filterParams);
     $exact = $query;
     $wholeLike = '%' . $query . '%';
     $mirrorParams[] = $exact;
@@ -55,9 +98,10 @@ if ($terms) {
     $mirrorParams[] = $exact;
     $mirrorParams[] = $wholeLike;
     $mirrorParams[] = $wholeLike;
+    $filterSql = $filterConditions ? ' AND ' . implode(' AND ', $filterConditions) : '';
     $mirrorSql = "SELECT m.*
         FROM mirrors m
-        WHERE m.status = 'active' AND (" . implode(' AND ', $mirrorParts) . ")
+        WHERE m.status = 'active' AND (" . implode(' AND ', $mirrorParts) . ")" . $filterSql . "
         ORDER BY CASE
             WHEN m.name_fa = ? OR m.name_en = ? OR m.url = ? THEN 0
             WHEN m.name_fa LIKE ? OR m.name_en LIKE ? THEN 1
@@ -125,6 +169,24 @@ if ($terms) {
         ORDER BY CASE WHEN type = 'software' THEN 0 ELSE 1 END, sort_order ASC, name ASC
         LIMIT 8
     ")->fetchAll();
+
+    if ($filtersApplied) {
+        $where = ["m.status = 'active'"];
+        if ($filterConditions) $where = array_merge($where, $filterConditions);
+        $stmt = $pdo->prepare("SELECT m.* FROM mirrors m WHERE " . implode(' AND ', $where) . " ORDER BY m.name_fa ASC LIMIT 60");
+        $stmt->execute($filterParams);
+        $mirrorResults = $stmt->fetchAll();
+        $mirrorIds = array_column($mirrorResults, 'id');
+        $categoryMap = getMirrorCategoryTagsMap($pdo, $mirrorIds);
+        $protocolMap = getMirrorProtocolsMap($pdo, $mirrorIds);
+        foreach ($mirrorResults as &$mirror) {
+            $id = (int)$mirror['id'];
+            $mirror['categories'] = $categoryMap[$id] ?? [];
+            $mirror['protocols'] = $protocolMap[$id] ?? [];
+        }
+        unset($mirror);
+        $monitorStatuses = monitorStatusMap($pdo, $mirrorIds);
+    }
 }
 
 $GLOBALS['pageSeo'] = [
@@ -153,8 +215,52 @@ renderHeader('جست‌وجو');
     </form>
     <p class="search-hint">جست‌وجو بین نام فارسی و انگلیسی، توضیحات، آدرس میرور، دسته‌بندی‌ها و عنوان/خلاصهٔ راهنما انجام می‌شود. همهٔ واژه‌های واردشده باید با نتیجه مرتبط باشند.</p>
 </section>
+ 
+    <form action="<?= SITE_URL ?>/search.php" method="GET" class="mirror-filter-form" aria-label="فیلتر میرورها">
+        <?php if ($displayQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($displayQuery, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
+        <div class="mirror-filter-title"><h2>فیلتر میرورها</h2><p>فیلترها با عبارت جست‌وجو ترکیب می‌شوند و فقط میرورهای فعال را نشان می‌دهند.</p></div>
+        <div class="mirror-filter-grid">
+            <label>وضعیت HTTP
+                <select name="status">
+                    <option value="">همهٔ وضعیت‌ها</option>
+                    <option value="up" <?= $filterStatus === 'up' ? 'selected' : '' ?>>آنلاین</option>
+                    <option value="slow" <?= $filterStatus === 'slow' ? 'selected' : '' ?>>کند</option>
+                    <option value="down" <?= $filterStatus === 'down' ? 'selected' : '' ?>>قطعی</option>
+                    <option value="unknown" <?= $filterStatus === 'unknown' ? 'selected' : '' ?>>هنوز بررسی نشده</option>
+                </select>
+            </label>
+            <label>پروتکل
+                <select name="protocol">
+                    <option value="">همهٔ پروتکل‌ها</option>
+                    <?php foreach (getProtocolOptions() as $key => $label): ?>
+                        <option value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= $filterProtocol === $key ? 'selected' : '' ?>><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>دسته‌بندی
+                <select name="category_id">
+                    <option value="">همهٔ دسته‌بندی‌ها</option>
+                    <?php foreach ($filterCategories as $cat): ?>
+                        <option value="<?= (int)$cat['id'] ?>" <?= $filterCategoryId === (int)$cat['id'] ? 'selected' : '' ?>><?= htmlspecialchars($cat['name'], ENT_QUOTES, 'UTF-8') ?><?= ($cat['type'] ?? '') === 'provider' ? ' — ارائه‌دهنده' : ' — نرم‌افزار' ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>سلامت متادیتا
+                <select name="repo_health">
+                    <option value="">همهٔ وضعیت‌های متادیتا</option>
+                    <option value="healthy" <?= $filterRepoHealth === 'healthy' ? 'selected' : '' ?>>متادیتا به‌روز</option>
+                    <option value="stale" <?= $filterRepoHealth === 'stale' ? 'selected' : '' ?>>متادیتا قدیمی</option>
+                    <option value="invalid" <?= $filterRepoHealth === 'invalid' ? 'selected' : '' ?>>مسیر یا فایل نامعتبر</option>
+                    <option value="error" <?= $filterRepoHealth === 'error' ? 'selected' : '' ?>>خطای بررسی</option>
+                    <option value="unknown" <?= $filterRepoHealth === 'unknown' ? 'selected' : '' ?>>وضعیت نامشخص</option>
+                    <option value="not_configured" <?= $filterRepoHealth === 'not_configured' ? 'selected' : '' ?>>تنظیم نشده</option>
+                </select>
+            </label>
+        </div>
+        <div class="mirror-filter-actions"><button type="submit" class="btn btn-primary">اعمال فیلترها</button><a class="btn btn-outline" href="<?= SITE_URL ?>/search.php">پاک‌کردن فیلترها</a></div>
+    </form>
 
-<?php if (!$terms): ?>
+<?php if (!$terms && !$filtersApplied): ?>
 <section class="section search-suggestions">
     <h2 class="section-title">شروع سریع</h2>
     <?php if ($quickCategories): ?>
@@ -176,8 +282,8 @@ renderHeader('جست‌وجو');
 <section class="section search-results-section">
     <div class="search-results-summary">
         <div>
-            <h2>نتایج برای «<?= htmlspecialchars($displayQuery, ENT_QUOTES, 'UTF-8') ?>»</h2>
-            <p role="status" aria-live="polite"><?= $totalResults ? number_format($totalResults, 0, '.', '٬') . ' نتیجهٔ مرتبط پیدا شد' : 'نتیجه‌ای پیدا نشد؛ عبارت کوتاه‌تر یا املای دیگری را امتحان کنید.' ?></p>
+            <h2><?php if ($terms): ?>نتایج برای «<?= htmlspecialchars($displayQuery, ENT_QUOTES, 'UTF-8') ?>»<?php else: ?>میرورهای مطابق فیلترها<?php endif; ?></h2>
+            <p role="status" aria-live="polite"><?= $totalResults ? number_format($totalResults, 0, '.', '٬') . ' نتیجهٔ مرتبط پیدا شد' : ($terms ? 'نتیجه‌ای پیدا نشد؛ عبارت کوتاه‌تر یا املای دیگری را امتحان کنید.' : 'میروری با این فیلترها پیدا نشد؛ یک گزینه را تغییر دهید.') ?></p>
         </div>
         <?php if ($totalResults > 0): ?>
             <div class="search-result-jumps" aria-label="رفتن به گروه نتایج">
@@ -236,6 +342,7 @@ renderHeader('جست‌وجو');
                             <?php endif; ?>
                         </div>
                         <div class="mirror-actions">
+                            <a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>" class="btn btn-sm btn-outline">جزئیات</a>
                             <a href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">بازکردن میرور</a>
                             <?= pingButton($mirror['url']) ?>
                         </div>

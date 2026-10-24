@@ -146,7 +146,8 @@ renderHeader($category['name']);
                             <?php endif; ?>
                         </div>
                         <div class="mirror-actions">
-                            <a href="<?= htmlspecialchars($mirror['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">مشاهده</a>
+                            <a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>" class="btn btn-sm btn-outline">جزئیات</a>
+                            <a href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">بازکردن</a>
                             <?= pingButton($mirror['url']) ?>
                         </div>
                     </div>
