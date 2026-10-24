@@ -108,7 +108,8 @@ renderHeader('وضعیت سرورها');
                 <thead>
                     <tr>
                         <th>میرور</th>
-                        <th>وضعیت</th>
+                        <th>وضعیت HTTP</th>
+                        <th>سلامت مخزن</th>
                         <th>زمان پاسخ</th>
                         <th>آپتایم ۳۰ روز</th>
                         <th>روند ۳۰ بررسی اخیر</th>
@@ -136,7 +137,11 @@ renderHeader('وضعیت سرورها');
                                     <div class="mon-since">قطعی از <?= monitorFaDateTime($row['down_since']) ?> (<?= monitorTimeAgoFa($row['down_since']) ?>)</div>
                                 <?php endif; ?>
                             </td>
-                            <td data-label="وضعیت" class="mon-cell-status"><?= monitorStatusBadge($row) ?></td>
+                            <td data-label="وضعیت HTTP" class="mon-cell-status"><?= monitorStatusBadge($row) ?></td>
+                            <td data-label="سلامت مخزن">
+                                <?= monitorRepositoryHealthBadge($row) ?>
+                                <?php if (!empty($row['repository_health_checked_at'])): ?><small class="mon-last-check"><?= monitorTimeAgoFa($row['repository_health_checked_at']) ?></small><?php endif; ?>
+                            </td>
                             <td data-label="زمان پاسخ">
                                 <?php if ($row['last_response_ms'] !== null && in_array($row['status'], ['up', 'slow'], true)): ?>
                                     <span class="mon-ms-value mon-ms-<?= htmlspecialchars($row['status']) ?>"><?= monitorFa((int)$row['last_response_ms']) ?> ms</span>
