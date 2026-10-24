@@ -23,7 +23,13 @@ $assert(str_contains($installer, 'install_csrf_token'), 'Installer CSRF token is
 $assert(str_contains($installer, 'password_hash($adminPassword'), 'Installer must hash the chosen admin password.');
 $assert(str_contains($installer, 'minlength="12"'), 'Installer must enforce a strong minimum password length.');
 $assert(str_contains($installer, 'pattern="[A-Za-z0-9_.-]{3,50}"'), 'Installer username constraints are missing.');
+$assert(str_contains($installer, "mb_strlen($adminPassword, 'UTF-8') < 12"), 'Installer must check password length by characters.');
 $assert(str_contains($installer, 'request_links'), 'Fresh installations must create request_links.');
+$functions = file_get_contents($root . '/includes/functions.php') ?: '';
+$categoryAdmin = file_get_contents($root . '/admin/categories.php') ?: '';
+$assert(!str_contains($functions, 'image/svg+xml'), 'Category icon upload must not accept SVG.');
+$assert(str_contains($functions, 'getimagesize'), 'Uploaded category icons must be checked as actual raster images.');
+$assert(str_contains($categoryAdmin, 'image/webp'), 'Category icon form must advertise WebP uploads.');
 $assert(str_contains($ignore, '/config.local.php'), 'Local config must be git-ignored.');
 $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct access to the local config file.');
 

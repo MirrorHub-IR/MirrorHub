@@ -184,8 +184,8 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
                             </form>
                         </div>
                     <?php endif; ?>
-                    <input type="file" id="icon" name="icon" accept="image/png,image/jpeg,image/jpg,image/svg+xml">
-                    <small class="form-hint">فرمت‌های مجاز: PNG, JPG, SVG | حداکثر حجم: ۵۰۰ کیلوبایت</small>
+                    <input type="file" id="icon" name="icon" accept="image/png,image/jpeg,image/webp">
+                    <small class="form-hint">فرمت‌های مجاز: PNG، JPG و WebP | حداکثر حجم: ۵۰۰ کیلوبایت</small>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">ذخیره</button>

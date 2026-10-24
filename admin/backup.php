@@ -13,7 +13,8 @@ $backupTables = [
 
 function backupTableExists(PDO $pdo, string $table): bool {
     if (!preg_match('/^[a-z_]+$/', $table)) return false;
-    $stmt = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote($table));
+    $stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+    $stmt->execute([$table]);
     return (bool)$stmt->fetchColumn();
 }
 

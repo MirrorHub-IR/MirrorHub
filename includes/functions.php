@@ -309,47 +309,56 @@ function getCategoryById($pdo, $id) {
 
 function uploadCategoryIcon($file, $oldIcon = null) {
     $uploadDir = __DIR__ . '/../uploads/category-icons/';
-    
-    // Create directory if it doesn't exist
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-    }
-    
-    // Validate file
+
     if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
         return ['success' => false, 'error' => 'فایلی آپلود نشده است.'];
     }
-    
-    // Check file size (max 500KB)
-    if ($file['size'] > 500 * 1024) {
-        return ['success' => false, 'error' => 'حجم فایل نباید بیشتر از ۵۰۰ کیلوبایت باشد.'];
+
+    if (!isset($file['size']) || (int)$file['size'] <= 0 || (int)$file['size'] > 500 * 1024) {
+        return ['success' => false, 'error' => 'حجم فایل باید بیشتر از صفر و حداکثر ۵۰۰ کیلوبایت باشد.'];
     }
-    
-    // Check file type
-    $allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+
+    // SVG is intentionally excluded: uploaded vector markup can carry active content.
+    $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    $allowedMimeByExtension = [
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+    ];
+    if (!isset($allowedMimeByExtension[$extension])) {
+        return ['success' => false, 'error' => 'فقط فایل‌های PNG، JPG و WebP مجاز هستند.'];
+    }
+
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    if ($finfo === false) {
+        return ['success' => false, 'error' => 'امکان بررسی نوع فایل وجود ندارد.'];
+    }
     $mimeType = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
-    
-    if (!in_array($mimeType, $allowedTypes)) {
-        return ['success' => false, 'error' => 'فرمت فایل معتبر نیست. فقط PNG, JPG و SVG مجاز است.'];
+
+    $imageInfo = @getimagesize($file['tmp_name']);
+    $expectedMime = $allowedMimeByExtension[$extension];
+    if ($mimeType !== $expectedMime || $imageInfo === false || ($imageInfo['mime'] ?? '') !== $expectedMime) {
+        return ['success' => false, 'error' => 'محتوای فایل با فرمت اعلام‌شده مطابقت ندارد.'];
     }
-    
-    // Generate unique filename
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = uniqid('cat_icon_', true) . '.' . strtolower($extension);
+
+    $canonicalExtension = $expectedMime === 'image/jpeg' ? 'jpg' : $extension;
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+        return ['success' => false, 'error' => 'ساخت پوشهٔ آپلود ناموفق بود.'];
+    }
+
+    $filename = 'cat_icon_' . bin2hex(random_bytes(16)) . '.' . $canonicalExtension;
     $filepath = $uploadDir . $filename;
-    
-    // Move uploaded file
+
     if (!move_uploaded_file($file['tmp_name'], $filepath)) {
         return ['success' => false, 'error' => 'خطا در ذخیره فایل.'];
     }
-    
-    // Delete old icon if exists
+
     if ($oldIcon && file_exists($uploadDir . basename($oldIcon))) {
         @unlink($uploadDir . basename($oldIcon));
     }
-    
+
     return ['success' => true, 'filename' => $filename];
 }
 

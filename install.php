@@ -47,7 +47,7 @@ try {
         } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $adminUsername)) {
             $error = 'نام کاربری باید ۳ تا ۵۰ نویسه و شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد.';
             $showSetupForm = true;
-        } elseif (strlen($adminPassword) < 12) {
+        } elseif (mb_strlen($adminPassword, 'UTF-8') < 12) {
             $error = 'رمز عبور مدیر باید حداقل ۱۲ نویسه داشته باشد.';
             $showSetupForm = true;
         } elseif ($adminPassword !== $confirmPassword) {
