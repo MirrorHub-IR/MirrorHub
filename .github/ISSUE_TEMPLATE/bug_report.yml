@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible bug in MirrorHub
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Please do not include passwords, API tokens, private user details, production dumps, or secret URLs."
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the unexpected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open ...
+2. Select ...
+3. Observe ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation / configuration
+        - Mirror listing / search
+        - Monitoring / repository health
+        - Public API
+        - Admin / backup
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA or version
+      description: Include the commit if known.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: PHP, MySQL/MariaDB, web server and relevant browser versions.
