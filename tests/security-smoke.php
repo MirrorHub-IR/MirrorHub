@@ -64,6 +64,8 @@ $assert(str_contains($htaccess, 'api/v1/contributions'), 'API contribution route
 $assert(str_contains($apiRouter, "api_version") && str_contains($apiRouter, "includes/api-v1.php"), 'API v1 dispatcher is missing.');
 $assert(str_contains($apiV1, 'function mirrorhubApiV1'), 'API v1 router is missing.');
 $assert(str_contains($apiV1, 'function mhApiValidateContribution'), 'Contribution validation is missing.');
+$assert(str_contains($apiV1, "hasTable($pdo,'mirror_protocols')"), 'API protocol filtering must support legacy databases without multi-protocol tables.');
+$assert(strpos($apiV1, 'mhApiQuota($pdo)') < strpos($apiV1, 'mhApiValidateContribution($in)'), 'API rate limiting must count invalid submission attempts.');
 $assert(str_contains($apiV1, 'hash_hmac') && str_contains($apiV1, 'CREATE TABLE IF NOT EXISTS api_rate_limits'), 'Submission rate limit is missing.');
 $assert(str_contains($apiV1, "'pending'"), 'API contributions must require moderation.');
 $assert(str_contains($apiV1, 'min(100,$n)'), 'API page size cap is missing.');

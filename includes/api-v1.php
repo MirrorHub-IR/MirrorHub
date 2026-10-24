@@ -73,9 +73,14 @@ function mhApiListMirrors(PDO $pdo,array $q,bool $providers=false):array {
     else throw new InvalidArgumentException('Invalid category.');}
     elseif(isset($q['category_id'])&&$q['category_id']!==''){$n=filter_var($q['category_id'],FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if($n===false)throw new InvalidArgumentException('Invalid category_id.');$where[]="EXISTS(SELECT 1 FROM mirror_categories mcx WHERE mcx.mirror_id=m.id AND mcx.category_id=?)";$params[]=(int)$n;}
     $proto=mhApiText($q['protocol']??'',32);
-    if($proto!==''){if(!array_key_exists($proto,getProtocolOptions()))throw new InvalidArgumentException('Invalid protocol.');
-      if($proto==='custom')$where[]="(EXISTS(SELECT 1 FROM mirror_protocols px WHERE px.mirror_id=m.id AND px.protocol='custom') OR (NOT EXISTS(SELECT 1 FROM mirror_protocols px0 WHERE px0.mirror_id=m.id) AND m.protocol IN('custom','other')))";
-      else{$where[]="(EXISTS(SELECT 1 FROM mirror_protocols px WHERE px.mirror_id=m.id AND px.protocol=?) OR (NOT EXISTS(SELECT 1 FROM mirror_protocols px0 WHERE px0.mirror_id=m.id) AND m.protocol=?))";$params[]=$proto;$params[]=$proto;}}
+    if($proto!==''){
+      if(!array_key_exists($proto,getProtocolOptions()))throw new InvalidArgumentException('Invalid protocol.');
+      if(hasTable($pdo,'mirror_protocols')){
+        if($proto==='custom')$where[]="(EXISTS(SELECT 1 FROM mirror_protocols px WHERE px.mirror_id=m.id AND px.protocol='custom') OR (NOT EXISTS(SELECT 1 FROM mirror_protocols px0 WHERE px0.mirror_id=m.id) AND m.protocol IN('custom','other')))";
+        else{$where[]="(EXISTS(SELECT 1 FROM mirror_protocols px WHERE px.mirror_id=m.id AND px.protocol=?) OR (NOT EXISTS(SELECT 1 FROM mirror_protocols px0 WHERE px0.mirror_id=m.id) AND m.protocol=?))";$params[]=$proto;$params[]=$proto;}
+      }elseif($proto==='custom')$where[]="m.protocol IN('custom','other')";
+      else{$where[]='m.protocol=?';$params[]=$proto;}
+    }
     $hs=mhApiText($q['http_status']??'',16);if($hs!==''){if(!in_array($hs,['up','slow','down','unknown'],true))throw new InvalidArgumentException('Invalid http_status.');$where[]="COALESCE((SELECT msx.status FROM mirror_status msx WHERE msx.mirror_id=m.id),'unknown')=?";$params[]=$hs;}
     $health=mhApiText($q['repository_health']??'',24);if($health!==''){if(!in_array($health,['healthy','stale','invalid','error','unknown','not_configured'],true))throw new InvalidArgumentException('Invalid repository_health.');$where[]="COALESCE((SELECT rhx.status FROM mirror_repository_health rhx WHERE rhx.mirror_id=m.id),'not_configured')=?";$params[]=$health;}
     if($providers)$where[]="EXISTS(SELECT 1 FROM mirror_categories pmc JOIN categories pc ON pc.id=pmc.category_id WHERE pmc.mirror_id=m.id AND pc.type='provider')";
@@ -96,12 +101,12 @@ function mhApiCategories(PDO $pdo,array $q):array {
 function mhApiContribution(PDO $pdo):void {
     if((int)($_SERVER['CONTENT_LENGTH']??0)>65536){mhApiError(413,'payload_too_large','بدنه حداکثر ۶۴ کیلوبایت باشد.');return;}
     if(strtolower(trim(explode(';',(string)($_SERVER['CONTENT_TYPE']??''))[0]))!=='application/json'){mhApiError(415,'unsupported_media_type','Content-Type باید application/json باشد.');return;}
-    $raw=file_get_contents('php://input',false,null,0,65537);if(!is_string($raw)||$raw===''){mhApiError(400,'invalid_json','بدنه JSON خالی است.');return;}if(strlen($raw)>65536){mhApiError(413,'payload_too_large','بدنه حداکثر ۶۴ کیلوبایت باشد.');return;}
-    $in=json_decode($raw,true);if(!is_array($in)||json_last_error()!==JSON_ERROR_NONE){mhApiError(400,'invalid_json','ساختار JSON معتبر نیست.');return;}
-    $v=mhApiValidateContribution($in);if(!$v['valid']){mhApiError(422,'validation_failed','برخی فیلدها معتبر نیستند.',$v['errors']);return;}
     try{$quota=mhApiQuota($pdo);}catch(Throwable $e){error_log('MirrorHub API v1: rate limiter unavailable.');mhApiError(503,'submission_unavailable','ثبت پیشنهاد موقتاً در دسترس نیست.');return;}
     header('X-RateLimit-Limit: '.$quota['limit']);header('X-RateLimit-Remaining: '.$quota['remaining']);header('X-RateLimit-Reset: '.$quota['reset']);
     if(!$quota['ok']){mhApiError(429,'rate_limit_exceeded','محدودیت ارسال؛ بعداً دوباره تلاش کنید.',[],['Retry-After'=>(string)$quota['retry']]);return;}
+    $raw=file_get_contents('php://input',false,null,0,65537);if(!is_string($raw)||$raw===''){mhApiError(400,'invalid_json','بدنه JSON خالی است.');return;}if(strlen($raw)>65536){mhApiError(413,'payload_too_large','بدنه حداکثر ۶۴ کیلوبایت باشد.');return;}
+    $in=json_decode($raw,true);if(!is_array($in)||json_last_error()!==JSON_ERROR_NONE){mhApiError(400,'invalid_json','ساختار JSON معتبر نیست.');return;}
+    $v=mhApiValidateContribution($in);if(!$v['valid']){mhApiError(422,'validation_failed','برخی فیلدها معتبر نیستند.',$v['errors']);return;}
     $d=$v['data'];if($d['website']!==''){mhApiOk(['status'=>'pending_review'],[],202,0);return;}
     if(!hasTable($pdo,'requests')||!hasTable($pdo,'request_links')||!hasTable($pdo,'request_protocols')){mhApiError(503,'schema_upgrade_required','ساختار ثبت پیشنهاد نیاز به به‌روزرسانی دارد.');return;}
     try{$pdo->beginTransaction();$s=$pdo->prepare("INSERT INTO requests(name_fa,name_en,url,protocol,parent_category_id,category_id,category_name,description,status,email,phone) VALUES(?,?,?,?,NULL,NULL,NULL,?,'pending',?,?)");
