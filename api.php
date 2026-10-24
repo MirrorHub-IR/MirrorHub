@@ -117,6 +117,12 @@ try {
                     'uptime_percent' => $row['uptime_percent'] !== null ? (float)$row['uptime_percent'] : null,
                     'down_since'     => $row['down_since'],
                     'last_checked_at'=> $row['last_checked_at'],
+                    'repository_health_profile' => $row['repository_health_profile'] ?? 'http_only',
+                    'repository_health_status' => $row['repository_health_status'] ?? 'not_configured',
+                    'repository_health_checked_at' => $row['repository_health_checked_at'] ?? null,
+                    'repository_metadata_date' => $row['repository_metadata_date'] ?? null,
+                    'repository_age_seconds' => isset($row['repository_age_seconds']) ? (int)$row['repository_age_seconds'] : null,
+                    'repository_health_message' => $row['repository_health_message'] ?? null,
                 ];
             }, monitorMirrorRows($pdo));
             $response['success'] = true;
