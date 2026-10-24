@@ -92,4 +92,4 @@ Contribution guidelines: [CONTRIBUTING.md](CONTRIBUTING.md). To report a securit
 
 ## License
 
-There is currently no LICENSE file in this repository. Do not assume that the project is released under an open-source license or that redistribution is automatically permitted. A maintainer should add the intended license before advertising reusable releases.
+This project is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**. See [LICENSE](LICENSE) for the full license text. Unless explicitly stated otherwise, this license applies to the project files for which the project maintainers hold the necessary rights.
