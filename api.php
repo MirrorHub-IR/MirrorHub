@@ -3,6 +3,12 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/monitoring.php';
 
+if ((string)($_GET['api_version'] ?? '') === '1') {
+    require_once 'includes/api-v1.php';
+    mirrorhubApiV1($pdo);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store, no-cache, must-revalidate');

@@ -1,6 +1,13 @@
 # MirrorHub routing and dependency-free static delivery
 RewriteEngine On
 
+# Versioned public API v1; legacy api.php?action=... remains available.
+RewriteRule ^api/v1/openapi\.json$ api.php?api_version=1&resource=openapi [L,QSA]
+RewriteRule ^api/v1/contributions/?$ api.php?api_version=1&resource=contributions [L,QSA]
+RewriteRule ^api/v1/status/([A-Za-z0-9._-]+)/history/?$ api.php?api_version=1&resource=history&slug=$1 [L,QSA,B]
+RewriteRule ^api/v1/mirrors/([A-Za-z0-9._-]+)/?$ api.php?api_version=1&resource=mirror&slug=$1 [L,QSA,B]
+RewriteRule ^api/v1/(mirrors|categories|stats|status)/?$ api.php?api_version=1&resource=$1 [L,QSA]
+
 # Stable public guide URLs
 RewriteRule ^guides/?$ docs.php [L,QSA]
 RewriteRule ^guides/([^/]+)/?$ docs.php?slug=$1 [L,QSA,B]
