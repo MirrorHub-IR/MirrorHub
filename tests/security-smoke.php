@@ -69,7 +69,7 @@ $assert(str_contains($apiV1, "'pending'"), 'API contributions must require moder
 $assert(str_contains($apiV1, 'min(100,$n)'), 'API page size cap is missing.');
 $assert(is_array($apiSpec) && ($apiSpec['openapi'] ?? '') === '3.1.0', 'OpenAPI spec is invalid.');
 $assert(isset($apiSpec['paths']['/mirrors'], $apiSpec['paths']['/contributions']), 'OpenAPI endpoints are incomplete.');
-$assert(str_contains($apiDocs, '۸ تلاش') && str_contains($apiExample, '/api/v1/status'), 'API docs or examples are missing.');
+$assert(str_contains($apiDocs, '۸ تلاش') && str_contains($apiExample, 'API_BASE/status'), 'API docs or examples are missing.');
 
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
