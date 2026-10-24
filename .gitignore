@@ -1,0 +1,13 @@
+# Local deployment secrets
+/config.local.php
+/.env
+/.env.*
+!/.env.example
+
+# Local backups and runtime logs
+/backup*.json
+/cron/monitor.log
+/cron/*.log
+
+# User-uploaded content (keep uploaded assets out of Git)
+/uploads/

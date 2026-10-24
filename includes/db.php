@@ -1,6 +1,11 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
+if (DB_NAME === '' || DB_USER === '' || DB_PASS === '') {
+    http_response_code(500);
+    die('تنظیمات اتصال پایگاه داده کامل نیست. متغیرهای محیطی MIRRORHUB_DB_NAME، MIRRORHUB_DB_USER و MIRRORHUB_DB_PASS را تنظیم کنید یا config.local.php را از روی config.local.example.php بسازید.');
+}
+
 try {
     $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
     $options = [

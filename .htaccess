@@ -37,3 +37,10 @@ RewriteRule ^robots\.txt$ robots.php [L]
 </IfModule>
 
 FileETag MTime Size
+
+# Local secrets must never be served directly.
+<IfModule mod_authz_core.c>
+    <FilesMatch "^(config\.local\.php|\.env(?:\..*)?)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
