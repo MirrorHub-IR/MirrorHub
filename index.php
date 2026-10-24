@@ -23,39 +23,60 @@ $providerCategories = $pdo->query(
 
 $stmt = $pdo->query("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT 12");
 $recentMirrors = $stmt->fetchAll();
+$recentIds = array_column($recentMirrors, 'id');
+$recentCategoryMap = getMirrorCategoryTagsMap($pdo, $recentIds);
+$recentProtocolMap = getMirrorProtocolsMap($pdo, $recentIds);
 foreach ($recentMirrors as &$mirror) {
-    $mirror['categories'] = getMirrorCategoryTags($pdo, $mirror['id']);
-    $mirror['protocols'] = getMirrorProtocols($pdo, $mirror['id']);
+    $id = (int)$mirror['id'];
+    $mirror['categories'] = $recentCategoryMap[$id] ?? [];
+    $mirror['protocols'] = $recentProtocolMap[$id] ?? [];
 }
 unset($mirror);
 
 // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
-$monitorStatuses = monitorStatusMap($pdo, array_column($recentMirrors, 'id'));
+$monitorStatuses = monitorStatusMap($pdo, $recentIds);
+
+$GLOBALS['pageSeo'] = [
+    'title' => 'MirrorHub | جست‌وجوی میرورهای نرم‌افزاری و مخازن',
+    'description' => 'در MirrorHub میرورهای نرم‌افزاری و مخازن را پیدا کنید، دسته‌بندی‌ها را مرور کنید و وضعیت ثبت‌شدهٔ سرویس‌ها و راهنماهای راه‌اندازی را ببینید.',
+    'canonical' => rtrim(SITE_URL, '/') . '/',
+];
 
 renderHeader('خانه');
 ?>
 
 <section class="hero">
-    <h1>مخزن <span>میرورهای نرم‌افزاری</span></h1>
-    <p>دسترسی سریع و آسان به آخرین نسخه‌های نرم‌افزارها و بسته‌ها</p>
-    <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form">
-        <input type="text" name="q" placeholder="جستجوی میرور..." required autocomplete="off">
-        <button type="submit">جستجو</button>
+    <span class="hero-kicker">MirrorHub · فهرست میرورها</span>
+    <h1>میرورهای <span>نرم‌افزاری</span> را آسان‌تر پیدا کنید</h1>
+    <p>جست‌وجوی مخازن و ارائه‌دهندگان، مرور دسته‌بندی‌ها و مشاهدهٔ وضعیت ثبت‌شدهٔ میرورها در یک جا.</p>
+    <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form" role="search" aria-label="جست‌وجوی میرورها">
+        <input type="search" name="q" aria-label="نام، توضیحات یا آدرس میرور" placeholder="مثلاً Ubuntu، Debian یا آدرس میرور..." required autocomplete="off">
+        <button type="submit">جست‌وجو</button>
     </form>
+    <p class="search-shortcut"><kbd>/</kbd> برای رفتن سریع به کادر جست‌وجو</p>
 </section>
 
+<?php if (!empty($softwareCategories) || !empty($providerCategories)): ?>
+<section class="category-filter-bar" hidden aria-label="پیدا کردن دسته‌بندی">
+    <label for="category-filter">دنبال کدام دسته‌بندی هستید؟</label>
+    <input id="category-filter" type="search" placeholder="نام نرم‌افزار یا ارائه‌دهنده را بنویسید..." autocomplete="off" >
+    <p id="category-filter-status" role="status" aria-live="polite">برای پیدا کردن سریع‌تر دسته‌بندی، نام آن را بنویسید.</p>
+    <p id="category-filter-empty" class="empty-state" hidden>دسته‌بندی‌ای با این عبارت پیدا نشد.</p>
+</section>
+<?php endif; ?>
+
 <?php if (!empty($softwareCategories)): ?>
-<section class="section">
+<section class="section category-list-section" id="software-categories" data-category-section>
     <div class="section-header">
         <h2 class="section-title">نرم‌افزارها</h2>
-        <span class="badge badge-primary"><?= count($softwareCategories) ?> دسته‌بندی</span>
+        <span class="badge badge-primary" data-category-count><?= count($softwareCategories) ?> دسته‌بندی</span>
     </div>
     <div class="grid grid-cols-3">
         <?php foreach ($softwareCategories as $cat): ?>
-            <div class="card category-card">
+            <div class="card category-card" data-category-card data-search="<?= htmlspecialchars($cat['name'] . ' ' . $cat['slug'] . ' ' . ($cat['description'] ?? '') . ' ' . ($cat['parent_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                 <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
                     <?php if (!empty($cat['icon'])): ?>
-                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">
+                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon" width="40" height="40" loading="lazy" decoding="async">
                     <?php endif; ?>
                     <?php if ($cat['parent_name']): ?>
                         <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
@@ -72,14 +93,14 @@ renderHeader('خانه');
 <?php endif; ?>
 
 <?php if (!empty($providerCategories)): ?>
-<section class="section">
+<section class="section category-list-section" id="provider-categories" data-category-section>
     <div class="section-header">
         <h2 class="section-title">ارائه‌دهندگان</h2>
-        <span class="badge badge-primary"><?= count($providerCategories) ?> دسته‌بندی</span>
+        <span class="badge badge-primary" data-category-count><?= count($providerCategories) ?> دسته‌بندی</span>
     </div>
     <div class="grid grid-cols-3">
         <?php foreach ($providerCategories as $cat): ?>
-            <div class="card category-card">
+            <div class="card category-card" data-category-card data-search="<?= htmlspecialchars($cat['name'] . ' ' . $cat['slug'] . ' ' . ($cat['description'] ?? '') . ' ' . ($cat['parent_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                 <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
                     <?php if (!empty($cat['icon'])): ?>
                         <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">

@@ -9,6 +9,9 @@ $rows = monitorMirrorRows($pdo);
 $incidents = monitorRecentIncidents($pdo, 10);
 $mirrorLimit = 40;
 $rows = array_slice($rows, 0, $mirrorLimit);
+$monitoredIds = array_column($rows, 'id');
+$uptimeSeriesByMirror = monitorUptimeSeriesMap($pdo, $monitoredIds, 30);
+$latencySeriesByMirror = monitorLatencySeriesMap($pdo, $monitoredIds, 30);
 
 /* وضعیت کلی برای بنر بالای صفحه */
 if ($summary['down'] > 0) {
@@ -21,6 +24,11 @@ if ($summary['down'] > 0) {
     $overall = ['class' => 'unknown', 'label' => 'هنوز بررسی خودکار انجام نشده است', 'icon' => 'info'];
 }
 
+$GLOBALS['pageSeo'] = [
+    'title' => 'وضعیت میرورها | پایش و دسترس‌پذیری در MirrorHub',
+    'description' => 'وضعیت ثبت‌شدهٔ میرورهای نرم‌افزاری، زمان پاسخ، آپتایم ۳۰ روزه و رخدادهای اخیر را در داشبورد MirrorHub بررسی کنید.',
+    'canonical' => rtrim(SITE_URL, '/') . '/status.php',
+];
 renderHeader('وضعیت سرورها');
 ?>
 
@@ -44,7 +52,10 @@ renderHeader('وضعیت سرورها');
                     — <?= monitorFa($summary['last_run_checked']) ?> میرور بررسی شد
                 <?php endif; ?>
                 <?php if ($summary['enabled']): ?>
-                    — اجرای خودکار بعدی تا <?= monitorFa((int)max(1, round($summary['interval_hours']))) ?> ساعت دیگر
+                    — بازهٔ پایش خودکار: <strong><?= htmlspecialchars(monitorIntervalLabel(monitorConfiguredIntervalHours($summary))) ?></strong>
+                    <?php if (!empty($summary['last_cron_run_at'])): ?>
+                        — آخرین فراخوانی زمان‌بند: <?= monitorTimeAgoFa($summary['last_cron_run_at']) ?>
+                    <?php endif; ?>
                 <?php else: ?>
                     — <strong class="mon-warn-text">پایش خودکار در تنظیمات غیرفعال است</strong>
                 <?php endif; ?>
@@ -108,8 +119,9 @@ renderHeader('وضعیت سرورها');
                     <?php foreach ($rows as $row): ?>
                         <?php
                             $names = mirrorDisplayName($row);
-                            $daily = monitorUptimeSeries($pdo, (int)$row['id'], 30);
-                            $latency = monitorLatencySeries($pdo, (int)$row['id'], 30);
+                            $rowId = (int)$row['id'];
+                            $daily = $uptimeSeriesByMirror[$rowId] ?? [];
+                            $latency = $latencySeriesByMirror[$rowId] ?? [];
                         ?>
                         <tr class="mon-row mon-row-<?= htmlspecialchars($row['status']) ?>">
                             <td data-label="میرور">
@@ -165,23 +177,23 @@ renderHeader('وضعیت سرورها');
             <tbody>
                 <?php foreach ($incidents as $inc): ?>
                     <tr>
-                        <td><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
-                        <td><?= monitorFaDateTime($inc['started_at']) ?></td>
-                        <td>
+                        <td data-label="میرور"><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
+                        <td data-label="شروع قطعی"><?= monitorFaDateTime($inc['started_at']) ?></td>
+                        <td data-label="پایان">
                             <?php if ($inc['ended_at']): ?>
                                 <?= monitorFaDateTime($inc['ended_at']) ?>
                             <?php else: ?>
                                 <span class="mon-badge mon-down"><span class="mon-dot"></span>ادامه دارد</span>
                             <?php endif; ?>
                         </td>
-                        <td>
+                        <td data-label="مدت">
                             <?php if ($inc['duration_s'] !== null): ?>
                                 <?= monitorDurationFa((int)$inc['duration_s']) ?>
                             <?php else: ?>
                                 —
                             <?php endif; ?>
                         </td>
-                        <td class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
+                        <td data-label="دلیل" class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -203,5 +215,5 @@ renderHeader('وضعیت سرورها');
 </section>
 
 <script>window.MH_MONITOR_REFRESH = 60;</script>
-<script src="<?= asset('js/monitor.js') ?>"></script>
+<script src="<?= asset('js/monitor.js') ?>" defer></script>
 <?php renderFooter(); ?>

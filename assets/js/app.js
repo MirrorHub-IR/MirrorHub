@@ -323,75 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCount();
     }
 
-    const suggestionForm = document.getElementById('suggestion-form');
-    const requestLinksList = document.getElementById('request-links-list');
-    const addRequestLink = document.getElementById('add-request-link');
-
-    if (suggestionForm && requestLinksList) {
-        const updateRequestLinkRows = () => {
-            const rows = Array.from(requestLinksList.querySelectorAll('.request-link-row'));
-            rows.forEach((row, index) => {
-                const number = row.querySelector('.request-link-index');
-                const remove = row.querySelector('.request-link-remove');
-                if (number) number.textContent = String(index + 1).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
-                if (remove) remove.disabled = rows.length === 1;
-            });
-        };
-
-        if (addRequestLink) {
-            addRequestLink.addEventListener('click', () => {
-                const row = document.createElement('div');
-                row.className = 'request-link-row';
-
-                const number = document.createElement('span');
-                number.className = 'request-link-index';
-
-                const input = document.createElement('input');
-                input.type = 'url';
-                input.name = 'urls[]';
-                input.required = true;
-                input.maxLength = 1000;
-                input.placeholder = 'https://example.com/mirror';
-                input.dir = 'ltr';
-                input.autocomplete = 'off';
-
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.className = 'request-link-remove btn btn-sm btn-outline';
-                remove.setAttribute('aria-label', 'حذف لینک');
-                remove.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-
-                row.append(number, input, remove);
-                requestLinksList.appendChild(row);
-                updateRequestLinkRows();
-                input.focus();
-            });
-        }
-
-        requestLinksList.addEventListener('click', (e) => {
-            const remove = e.target.closest('.request-link-remove');
-            if (!remove) return;
-            const row = remove.closest('.request-link-row');
-            if (row && requestLinksList.querySelectorAll('.request-link-row').length > 1) {
-                row.remove();
-                updateRequestLinkRows();
-            }
-        });
-
-        updateRequestLinkRows();
-
-        suggestionForm.addEventListener('submit', (e) => {
-            const protocols = suggestionForm.querySelectorAll('input[name="protocols[]"]:checked');
-            const links = suggestionForm.querySelectorAll('input[name="urls[]"]');
-            const phone = document.getElementById('phone');
-            const hasInvalidLink = Array.from(links).some(input => !input.checkValidity() || !input.value.trim());
-            if (!protocols.length || !links.length || hasInvalidLink || !phone?.value.trim()) {
-                e.preventDefault();
-                showAlert('حداقل یک لینک معتبر، یک پروتکل و شماره همراه الزامی است.', 'warning', 'اطلاعات ناقص');
-            }
-        });
-    }
-
     /* ============================================================
        Multi Protocol Picker
        ============================================================ */
@@ -690,58 +621,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ============================================================
-       Responsive Navigation
-       ============================================================ */
-    const mainHeader = document.querySelector('.main-header');
-    const navToggle = document.querySelector('.nav-toggle');
-    const mainNav = document.getElementById('main-navigation');
-
-    if (mainHeader && navToggle && mainNav) {
-        const closeNavigation = () => {
-            mainHeader.classList.remove('nav-open');
-            navToggle.setAttribute('aria-expanded', 'false');
-            navToggle.setAttribute('aria-label', 'باز کردن منو');
-        };
-
-        navToggle.addEventListener('click', () => {
-            const open = mainHeader.classList.toggle('nav-open');
-            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            navToggle.setAttribute('aria-label', open ? 'بستن منو' : 'باز کردن منو');
-        });
-
-        mainNav.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', closeNavigation);
-        });
-
-        document.addEventListener('click', e => {
-            if (mainHeader.classList.contains('nav-open') && !mainHeader.contains(e.target)) {
-                closeNavigation();
-            }
-        });
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeNavigation();
-        });
-
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 760) closeNavigation();
-        });
-    }
-
-    /* ============================================================
-       Focus Search on '/' key
-       ============================================================ */
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-            const searchInput = document.querySelector('.search-form input[name="q"]');
-            if (searchInput) {
-                e.preventDefault();
-                searchInput.focus();
-            }
-        }
-    });
-
-    /* ============================================================
        Review Request Modal
        ============================================================ */
     document.querySelectorAll('[data-review-request]').forEach(btn => {
@@ -844,4 +723,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
+
+
 });

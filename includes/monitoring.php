@@ -1,12 +1,14 @@
 <?php
 
+require_once __DIR__ . '/jalali.php';
+
 /* ============================================================
    MirrorHub — سامانه پایش میرورها (Server-side Monitoring)
    ------------------------------------------------------------
    این فایل هستهٔ اصلی «پایشگر» سایت است:
 
-   • هر روز (یا هر بازهٔ قابل تنظیم) به‌صورت خودکار روی لینک همهٔ
-     میرورهای فعال، یک پینگ سمت سرور (HTTP/HTTPS) انجام می‌شود.
+   • طبق بازه‌ای که در پنل مدیریت انتخاب می‌شود، روی لینک میرورهای فعال
+     متصل به دستهٔ «ارائه‌دهنده» پینگ سمت سرور (HTTP/HTTPS) انجام می‌شود.
    • نتیجهٔ هر بررسی (زمان پاسخ، کد HTTP، خطای احتمالی و...) در
      جدول mirror_checks ثبت و آمار روزانه/۳۰ روزه به‌روز می‌شود.
    • وضعیت لحظه‌ای هر میرور (آنلاین / کند / قطع) در mirror_status
@@ -19,7 +21,7 @@
    ============================================================ */
 
 const MONITOR_SCHEMA_VERSION = 1;
-const MONITOR_DEFAULT_CRON_HOURS = 24;
+const MONITOR_DEFAULT_CRON_HOURS = 1;
 
 /* برخی بیلدهای PHP (به‌خصوص روی ویندوز) ثابت‌های خطای cURL را
    صادر نمی‌کنند؛ در صورت نبود، از مقادیر استاندارد استفاده می‌شود. */
@@ -41,14 +43,47 @@ foreach ([
    تنظیمات (monitor_settings)
    ============================================================ */
 
+/** بازه‌های پیشنهادی در پنل؛ مقدارهای قدیمی هم برای سازگاری حفظ می‌شوند. */
+function monitorIntervalChoices(): array {
+    return [1, 2, 3, 4, 6, 8, 12, 24, 48, 72, 168];
+}
+
+function monitorConfiguredIntervalHours(array $settings): int {
+    return max(1, min(168, (int)($settings['interval_hours'] ?? 1)));
+}
+
+/** عبارت cron متناسب با بازهٔ پایش ذخیره‌شده در برنامه. */
+function monitorCronExpression(int $hours): string {
+    $hours = max(1, min(168, $hours));
+    if ($hours >= 24) {
+        // زمان‌بند روزانه فراخوانی می‌شود؛ برنامه با last_run_at بازه‌های چندروزه را اعمال می‌کند.
+        return '0 0 * * *';
+    }
+    if (in_array($hours, [1, 2, 3, 4, 6, 8, 12], true)) {
+        return '0 */' . $hours . ' * * *';
+    }
+    // سازگاری با تنظیم‌های دلخواه قدیمی: cron ساعتی فراخوانی می‌شود و
+    // monitorRunCycle تضمین می‌کند که چرخه زودتر از بازهٔ انتخابی اجرا نشود.
+    return '0 * * * *';
+}
+
+function monitorIntervalLabel(int $hours): string {
+    $hours = max(1, min(168, $hours));
+    if ($hours === 24) return 'روزی یک‌بار (هر ۲۴ ساعت)';
+    if ($hours === 48) return 'هر ۲ روز یک‌بار';
+    if ($hours === 72) return 'هر ۳ روز یک‌بار';
+    if ($hours === 168) return 'هفته‌ای یک‌بار';
+    return 'هر ' . monitorFa($hours) . ' ساعت';
+}
+
 function monitorDefaults(): array {
     return [
         'enabled'             => '1',     // ۱ = پایش فعال، ۰ = غیرفعال
         'timeout_seconds'     => '8',     // حداکثر انتظار برای پاسخ هر لینک
         'slow_threshold_ms'   => '1200',  // از این زمان به بعد، وضعیت «کند» محسوب می‌شود
-        'interval_hours'      => '1',     // فاصلهٔ مستقل پایش خودکار (ساعت)
+        'interval_hours'      => '1',     // فاصلهٔ چرخهٔ واقعی پایش در پنل مدیریت (ساعت)
         'batch_limit'          => '200',   // سقف هدف در هر چرخه؛ برای اجرای سبک‌تر
-        'failure_threshold'    => '2',     // تعداد خطاهای متوالی پیش از اعلام قطعی    // بازهٔ اجرای خودکار چرخهٔ پایش (پیش‌فرض: روزی یک بار)
+        'failure_threshold'    => '2',     // تعداد خطاهای متوالی پیش از اعلام قطعی
         'retention_days'      => '180',   // نگهداری تاریخچهٔ بررسی‌ها به روز
         'uptime_window_days'  => '30',    // پنجرهٔ محاسبهٔ آپتایم
         'alert_down'          => '1',     // هشدار هنگام قطع شدن میرور
@@ -59,9 +94,12 @@ function monitorDefaults(): array {
         'telegram_chat_id'    => '',      // سازگاری با تنظیمات قدیمی؛ دیگر استفاده نمی‌شود
         'webhook_url'         => '',      // آدرس وب‌هوک دلخواه برای دریافت هشدارها (اختیاری)
         'last_run_at'         => '',
+        'last_cycle_started_at' => '',
         'last_run_ms'         => '0',
         'last_run_checked'    => '0',
         'last_attempt_at'     => '',
+        'previous_cron_run_at'=> '',
+        'last_cron_run_at'    => '',
         'cron_key'            => '',      // کلید دسترسی endpoint زمان‌بند وب
     ];
 }
@@ -105,6 +143,16 @@ function monitorSaveSettings(PDO $pdo, array $values): void {
 function monitorSettingsReset(): void {
     // تازه‌سازی کشِ داخلِ همان درخواست، پس از ذخیرهٔ تنظیمات
     unset($GLOBALS['__mh_monitor_settings']);
+}
+
+/** ثبت زمان اجرای واقعی cron بیرونی؛ برای نمایش زمان‌بندی مشاهده‌شده در صفحهٔ عمومی */
+function monitorRecordCronInvocation(PDO $pdo): void {
+    $settings = monitorSettings($pdo);
+    $previous = trim((string)($settings['last_cron_run_at'] ?? ''));
+    monitorSaveSettings($pdo, [
+        'previous_cron_run_at' => $previous,
+        'last_cron_run_at' => date('Y-m-d H:i:s'),
+    ]);
 }
 
 /* کلید cron وب (برای فراخوانی cron.php از سرویس‌های web-cron) */
@@ -503,6 +551,23 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
         return $out;
     }
 
+    // اجرای زمان‌بند (cron) نباید از بازه‌ای که ادمین تعیین کرده زودتر چرخه‌ای را انجام دهد.
+    // اجرای دستی پنل با force=true عمداً از این محدودیت عبور می‌کند.
+    $source = (string)($opts['source'] ?? '');
+    if (empty($opts['force']) && in_array($source, ['cron-cli', 'cron-web'], true)) {
+        $intervalHours = monitorConfiguredIntervalHours($settings);
+        $lastCycleTs = !empty($settings['last_cycle_started_at'])
+            ? strtotime((string)$settings['last_cycle_started_at'])
+            : (!empty($settings['last_run_at']) ? strtotime((string)$settings['last_run_at']) : false);
+        // Small grace window avoids skipping a daily job due to a few seconds of scheduling jitter.
+        $minimumElapsed = max(0, ($intervalHours * 3600) - 300);
+        if ($lastCycleTs !== false && (time() - $lastCycleTs) < $minimumElapsed) {
+            $out['skipped'] = true;
+            $out['reason'] = 'بازهٔ تنظیم‌شدهٔ پایش (' . $intervalHours . ' ساعت) هنوز نگذشته است.';
+            return $out;
+        }
+    }
+
     if (!ensureMonitorSchema($pdo)) {
         $out['skipped'] = true;
         $out['reason'] = 'جدول‌های پایش ساخته نشدند.';
@@ -522,6 +587,9 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
     }
 
     try {
+        // Record the start time separately from completion so long cycles don't delay the next scheduled slot.
+        monitorSaveSettings($pdo, ['last_cycle_started_at' => date('Y-m-d H:i:s')]);
+
         $timeout   = monitorClampInt($settings['timeout_seconds'], 2, 30, 8);
         $slowMs    = monitorClampInt($settings['slow_threshold_ms'], 100, 30000, 1200);
         $retention = monitorClampInt($settings['retention_days'], 7, 730, 180);
@@ -785,7 +853,7 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
         $url = $alert['mirror']['url'];
 
         if ($to === 'down' && (int)($settings['alert_down'] ?? 1) === 1) {
-            $text = "🔴 قطعی میرور\n«{$name}»\n{$url}\nدلیل: " . ($alert['note'] ?? 'نامشخص') . "\nزمان: " . date('Y/m/d H:i');
+            $text = "🔴 قطعی میرور\n«{$name}»\n{$url}\nدلیل: " . ($alert['note'] ?? 'نامشخص') . "\nزمان: " . jalaliFormatDate(time(), 'Y/m/d H:i');
             if (monitorNotify($settings, $text)) $sent++;
         } elseif ($from === 'down' && $to !== 'down' && (int)($settings['alert_recovery'] ?? 1) === 1) {
             $duration = '';
@@ -793,7 +861,7 @@ function monitorDispatchAlerts(array $settings, array $alerts): int {
                 $secs = max(0, time() - strtotime($alert['down_since']));
                 $duration = "\nمدت قطعی: " . monitorDurationFa($secs);
             }
-            $text = "🟢 برگشت میرور\n«{$name}»\n{$url}\nوضعیت تازه: " . monitorStatusFa($to) . "{$duration}\nزمان: " . date('Y/m/d H:i');
+            $text = "🟢 برگشت میرور\n«{$name}»\n{$url}\nوضعیت تازه: " . monitorStatusFa($to) . "{$duration}\nزمان: " . jalaliFormatDate(time(), 'Y/m/d H:i');
             if (monitorNotify($settings, $text)) $sent++;
         }
     }
@@ -879,7 +947,9 @@ function monitorMaybeRunDaily(PDO $pdo): void {
         if ($intervalH <= 0) $intervalH = MONITOR_DEFAULT_CRON_HOURS;
 
         $now = time();
-        $lastRun = !empty($settings['last_run_at']) ? strtotime($settings['last_run_at']) : false;
+        $lastRun = !empty($settings['last_cycle_started_at'])
+            ? strtotime($settings['last_cycle_started_at'])
+            : (!empty($settings['last_run_at']) ? strtotime($settings['last_run_at']) : false);
         $lastTry = !empty($settings['last_attempt_at']) ? strtotime($settings['last_attempt_at']) : false;
 
         if ($lastRun !== false && ($now - $lastRun) < $intervalH * 3600) return;
@@ -926,6 +996,8 @@ function monitorStatusSummary(PDO $pdo): array {
         'mirrors' => 0, 'up' => 0, 'slow' => 0, 'down' => 0, 'unknown' => 0,
         'avg_response_ms' => null, 'uptime_percent' => null,
         'last_run_at' => null, 'last_run_ms' => 0, 'last_run_checked' => 0,
+        'last_cron_run_at' => null, 'previous_cron_run_at' => null,
+        'observed_cron_interval_seconds' => null,
         'open_incidents' => 0, 'total_checks' => 0,
     ];
     try {
@@ -966,6 +1038,15 @@ function monitorStatusSummary(PDO $pdo): array {
         $out['last_run_checked'] = (int)$settings['last_run_checked'];
         $out['enabled'] = (int)$settings['enabled'] === 1;
         $out['interval_hours'] = (float)$settings['interval_hours'];
+        $out['last_cron_run_at'] = $settings['last_cron_run_at'] ?: null;
+        $out['previous_cron_run_at'] = $settings['previous_cron_run_at'] ?: null;
+        if (!empty($out['last_cron_run_at']) && !empty($out['previous_cron_run_at'])) {
+            $lastCronTs = strtotime((string)$out['last_cron_run_at']);
+            $previousCronTs = strtotime((string)$out['previous_cron_run_at']);
+            if ($lastCronTs !== false && $previousCronTs !== false && $lastCronTs > $previousCronTs) {
+                $out['observed_cron_interval_seconds'] = $lastCronTs - $previousCronTs;
+            }
+        }
     } catch (Throwable $e) {
     }
     return $out;
@@ -1007,6 +1088,58 @@ function monitorStatusMap(PDO $pdo, array $mirrorIds): array {
     } catch (Throwable $e) {
         return [];
     }
+}
+
+/** Fetch daily uptime series for multiple mirrors with one query. */
+function monitorUptimeSeriesMap(PDO $pdo, array $mirrorIds, int $days = 30): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $days = max(1, min(3660, $days));
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mirror_id, day, checks, up, slow, down, sum_ms
+            FROM mirror_daily_stats
+            WHERE mirror_id IN ($in) AND day >= DATE_SUB(CURDATE(), INTERVAL $days DAY)
+            ORDER BY mirror_id, day ASC");
+        foreach ($stmt as $row) {
+            $map[(int)$row['mirror_id']][$row['day']] = $row;
+        }
+    } catch (Throwable $e) {
+        foreach ($ids as $id) $map[$id] = monitorUptimeSeries($pdo, $id, $days);
+    }
+    return $map;
+}
+
+/** Fetch the newest latency points for every mirror in a single query where window functions are supported. */
+function monitorLatencySeriesMap(PDO $pdo, array $mirrorIds, int $points = 30): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $points = max(1, min(200, $points));
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mirror_id, response_ms, status, checked_at
+            FROM (
+                SELECT mirror_id, response_ms, status, checked_at,
+                       ROW_NUMBER() OVER (PARTITION BY mirror_id ORDER BY id DESC) AS row_num
+                FROM mirror_checks
+                WHERE mirror_id IN ($in) AND response_ms IS NOT NULL AND status IN ('up','slow')
+            ) AS ranked_checks
+            WHERE row_num <= $points
+            ORDER BY mirror_id, checked_at ASC");
+        foreach ($stmt as $row) {
+            $map[(int)$row['mirror_id']][] = [
+                'ms' => (int)$row['response_ms'],
+                'status' => $row['status'],
+                'at' => $row['checked_at'],
+            ];
+        }
+    } catch (Throwable $e) {
+        // Older MySQL/MariaDB versions fall back to the original compatible query.
+        foreach ($ids as $id) $map[$id] = monitorLatencySeries($pdo, $id, $points);
+    }
+    return $map;
 }
 
 /** سری روزانهٔ آپتایم برای نوار ۳۰ روزه */
@@ -1081,7 +1214,7 @@ function monitorFa($value): string {
 function monitorFaDateTime(?string $datetime): string {
     if (empty($datetime)) return '—';
     $ts = strtotime($datetime);
-    return $ts ? monitorFa(date('Y/m/d H:i', $ts)) : '—';
+    return $ts ? monitorFa(jalaliFormatDate($ts, 'Y/m/d H:i', false)) : '—';
 }
 
 /** «۵ دقیقه پیش» */
@@ -1154,7 +1287,7 @@ function monitorUptimeBar(array $daily, int $days = 30): string {
     for ($i = $days - 1; $i >= 0; $i--) {
         $day = date('Y-m-d', strtotime("-$i day"));
         $row = $daily[$day] ?? null;
-        $short = date('m/d', strtotime($day));
+        $short = monitorFa(jalaliFormatDate($day, 'm/d', false));
         if (!$row || (int)$row['checks'] === 0) {
             $html .= '<span class="uptime-seg is-none" title="' . $short . ' — بدون بررسی"></span>';
             continue;

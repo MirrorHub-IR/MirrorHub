@@ -70,7 +70,6 @@ $categories=$pdo->query("SELECT id,name FROM categories WHERE type='software' OR
 $articles=$pdo->query("SELECT a.id,a.title,a.slug,a.status,a.updated_at,c.name AS category_name FROM cms_articles a LEFT JOIN categories c ON c.id=a.category_id ORDER BY a.updated_at DESC")->fetchAll();
 renderHeader('مدیریت راهنماها', true);
 ?>
-<link rel="stylesheet" href="<?= asset('css/cms.css') ?>">
 <section class="section">
 <div class="section-header"><h1 class="section-title">مدیریت راهنماها</h1><a class="btn btn-primary" href="<?= SITE_URL ?>/admin/pages.php?action=add">مقاله جدید</a></div>
 <p class="category-desc">محتوای Markdown، انتشار، SEO و اتصال به دسته‌های نرم‌افزار از همین پنل مدیریت می‌شود.</p>
@@ -81,7 +80,7 @@ renderHeader('مدیریت راهنماها', true);
 <div class="cms-form-grid">
 <label>عنوان مقاله<input name="title" maxlength="200" required value="<?= htmlspecialchars((string)$article['title']) ?>"></label>
 <label>نامک URL<input name="slug" maxlength="190" value="<?= htmlspecialchars((string)$article['slug']) ?>" placeholder="alpine-repositories"></label>
-<label>دسته نرم‌افزار<select name="category_id"><option value="0">بدون دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option><?php endforeach; ?></select></label>
+<label>راهنمای مربوط به کدام دسته است؟<select name="category_id"><option value="0">بدون اتصال به دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option><?php endforeach; ?></select><small class="form-hint">بعد از انتشار، لینک این راهنما در صفحهٔ همان دستهٔ نرم‌افزاری نمایش داده می‌شود؛ مثلاً دستهٔ Ubuntu.</small></label>
 <label>وضعیت انتشار<select name="status"><option value="draft" <?= $article['status']==='draft'?'selected':'' ?>>پیش‌نویس</option><option value="published" <?= $article['status']==='published'?'selected':'' ?>>منتشرشده</option></select></label>
 </div>
 <label>خلاصه<textarea name="excerpt" rows="2" maxlength="500"><?= htmlspecialchars((string)($article['excerpt'] ?? '')) ?></textarea></label>
@@ -95,7 +94,7 @@ renderHeader('مدیریت راهنماها', true);
 </form>
 <?php else: ?>
 <div class="table-responsive"><table class="data-table"><thead><tr><th>عنوان</th><th>دسته</th><th>وضعیت</th><th>آخرین ویرایش</th><th>عملیات</th></tr></thead><tbody>
-<?php foreach($articles as $a): ?><tr><td><?= htmlspecialchars($a['title']) ?><small class="cms-table-slug">/guides/<?= htmlspecialchars($a['slug']) ?></small></td><td><?= htmlspecialchars($a['category_name'] ?? '—') ?></td><td><?= $a['status']==='published'?'منتشرشده':'پیش‌نویس' ?></td><td><?= htmlspecialchars($a['updated_at']) ?></td><td><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/pages.php?action=edit&id=<?= (int)$a['id'] ?>">ویرایش</a> <form method="post" action="<?= SITE_URL ?>/admin/pages.php?id=<?= (int)$a['id'] ?>" class="cms-inline-form" onsubmit="return confirm('مقاله حذف شود؟')"><input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken()) ?>"><button class="btn btn-sm btn-danger" name="req_action" value="delete">حذف</button></form><?php if($a['status']==='published'): ?> <a class="btn btn-sm btn-outline" target="_blank" rel="noopener" href="<?= SITE_URL ?>/guides/<?= rawurlencode($a['slug']) ?>">نمایش</a><?php endif; ?></td></tr><?php endforeach; ?>
+<?php foreach($articles as $a): ?><tr><td data-label="عنوان"><?= htmlspecialchars($a['title']) ?><small class="cms-table-slug">/guides/<?= htmlspecialchars($a['slug']) ?></small></td><td data-label="دسته"><?= htmlspecialchars($a['category_name'] ?? '—') ?></td><td data-label="وضعیت"><?= $a['status']==='published'?'منتشرشده':'پیش‌نویس' ?></td><td data-label="آخرین ویرایش"><?= htmlspecialchars(formatDate($a['updated_at'], 'Y/m/d H:i')) ?></td><td data-label="عملیات" class="actions"><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/pages.php?action=edit&id=<?= (int)$a['id'] ?>">ویرایش</a> <form method="post" action="<?= SITE_URL ?>/admin/pages.php?id=<?= (int)$a['id'] ?>" class="cms-inline-form" onsubmit="return confirm('مقاله حذف شود؟')"><input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken()) ?>"><button class="btn btn-sm btn-danger" name="req_action" value="delete">حذف</button></form><?php if($a['status']==='published'): ?> <a class="btn btn-sm btn-outline" target="_blank" rel="noopener" href="<?= SITE_URL ?>/guides/<?= rawurlencode($a['slug']) ?>">نمایش</a><?php endif; ?></td></tr><?php endforeach; ?>
 </tbody></table></div>
 <?php if(!$articles): ?><p class="empty-state">هنوز مقاله‌ای نوشته نشده است.</p><?php endif; ?>
 <?php endif; ?>

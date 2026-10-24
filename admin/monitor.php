@@ -111,7 +111,12 @@ $summary = monitorStatusSummary($pdo);
 $rows = monitorMirrorRows($pdo);
 $incidents = monitorRecentIncidents($pdo, 10);
 $cronKey = monitorCronKey($pdo);
+$intervalHours = monitorConfiguredIntervalHours($settings);
+$cronExpression = monitorCronExpression($intervalHours);
+$windowsSchedule = $intervalHours < 24 ? 'HOURLY' : 'DAILY';
+$windowsModifier = $intervalHours < 24 ? $intervalHours : max(1, (int)($intervalHours / 24));
 $cronUrl = SITE_URL . '/cron.php?key=' . ($cronKey !== '' ? htmlspecialchars($cronKey) : 'YOUR_KEY');
+$cronTestUrl = $cronUrl . '&source=manual';
 $scheme = parse_url(SITE_URL, PHP_URL_SCHEME) ?: 'https';
 
 renderHeader('پایش سرورها', true);
@@ -130,8 +135,16 @@ renderHeader('پایش سرورها', true);
         </div>
     </div>
     <p class="section-desc">
-        پایشگر به‌صورت خودکار هر <strong><?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت</strong>
-        فقط ارائه‌دهندگانِ فعال را بررسی می‌کند، آمار را ثبت می‌کند و در صورت قطعی هشدار می‌فرستد.
+        سامانه فقط میرورهای فعالی را پایش می‌کند که به یک دستهٔ «ارائه‌دهنده» متصل باشند.
+        بازهٔ فعلی اجرای واقعی پایش: <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong>.
+        همین مقدار در صفحهٔ عمومی وضعیت نمایش داده می‌شود و اجرای زمان‌بندی‌شدهٔ زودتر از موعد را متوقف می‌کند.
+        <?php if (!empty($summary['observed_cron_interval_seconds'])): ?>
+            فاصلهٔ مشاهده‌شده بین دو فراخوانی اخیر Cron: <strong><?= monitorDurationFa((int)$summary['observed_cron_interval_seconds']) ?></strong>.
+        <?php elseif (!empty($summary['last_cron_run_at'])): ?>
+            آخرین فراخوانی Cron: <strong><?= monitorTimeAgoFa($summary['last_cron_run_at']) ?></strong>؛ برای تخمین فاصله به اجرای بعدی نیاز است.
+        <?php else: ?>
+            هنوز اجرای زمان‌بند ثبت نشده است.
+        <?php endif; ?>
     </p>
 
     <div class="stats-grid">
@@ -245,29 +258,33 @@ renderHeader('پایش سرورها', true);
         </p>
         <ol class="mon-cron-list">
             <li>
-                <strong>cron سرور (توصیه‌شده):</strong>
-                <code class="ltr-text">0 * * * * php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
+                <strong>cron سرور (مطابق بازهٔ انتخاب‌شده):</strong>
+                <code class="ltr-text"><?= htmlspecialchars($cronExpression) ?> php <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron.php >> <?= htmlspecialchars(rtrim(str_replace('\\', '/', dirname(__DIR__)), '/')) ?>/cron/monitor.log 2>&1</code>
             </li>
             <li>
-                <strong>وظیفهٔ زمان‌بندی‌شدهٔ ویندوز:</strong>
-                <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC DAILY /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
+                <strong>وظیفهٔ زمان‌بندی‌شدهٔ ویندوز (مطابق بازهٔ انتخاب‌شده):</strong>
+                <code class="ltr-text">schtasks /Create /TN "MirrorHub-Monitor" /SC <?= htmlspecialchars($windowsSchedule) ?> /MO <?= (int)$windowsModifier ?> /ST 04:15 /TR "\"C:\wamp64\bin\php\php8.2.26\php.exe\" \"<?= htmlspecialchars(dirname(__DIR__) . '\cron.php') ?>\""</code>
             </li>
             <li>
-                <strong>سرویس‌های web-cron:</strong> این آدرس را در سرویسی مثل cron-job.org با تکرار ساعتی ثبت کنید:
+                <strong>سرویس‌های web-cron:</strong> در سرویس زمان‌بندی بیرونی نیز بازهٔ <strong><?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?></strong> را انتخاب کن. برنامه بازهٔ تنظیم‌شده را رعایت می‌کند:
                 <code class="ltr-text" dir="ltr"><?= $cronUrl ?></code>
-                <a href="<?= $cronUrl ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
-                <span class="form-hint">با باز کردن این آدرس، یک چرخهٔ کامل اجرا می‌شود و پاسخ JSON می‌بینید؛ کلید دسترسی را می‌توانید از تنظیمات زیر ببینید.</span>
+                <a href="<?= htmlspecialchars($cronTestUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline" target="_blank" rel="noopener noreferrer">تست این آدرس</a>
+                <span class="form-hint">برای اجرای زمان‌بندی‌شده از همین آدرس استفاده کن و بازهٔ <?= htmlspecialchars(monitorIntervalLabel($intervalHours)) ?> را در سرویس ثبت کن. لینک آزمایش، یک اجرای دستی انجام می‌دهد.</span>
             </li>
         </ol>
         <p class="mon-hint-line">
-            اگر هیچ‌کدام در دسترس نباشد، خود سایت هنگام بازدید کاربران و به‌صورت خودکار چرخه را اجرا می‌کند
-            (حداکثر یک بار در هر <?= monitorFa(number_format((float)$settings['interval_hours'])) ?> ساعت).
+            اگر Cron سرور یا web-cron فعال نیست، سایت فقط هنگام بازدید کاربران اجرای جایگزین را امتحان می‌کند؛ این روش برای محیط تولید قابل‌اتکا نیست.
+            اگر سرویس Cron بیشتر از این بازه فراخوانی شود، برنامه چرخهٔ واقعی پایش را تا رسیدن موعد بعدی اجرا نمی‌کند. اجرای دستی پنل از این محدودیت مستثنا است.
         </p>
     </div>
 </section>
 
 <section class="section">
-    <h2 class="section-title">تنظیمات پایش</h2>
+    <h2 class="section-title">تنظیمات پالایش و پایش</h2>
+    <div class="mon-info-box">
+        <h3>راهنمای سریع</h3>
+        <p>زمان انتظار تعیین می‌کند چقدر منتظر پاسخ بمانیم؛ آستانهٔ کندی سرعت پایین را مشخص می‌کند؛ خطای متوالی کمک می‌کند یک قطعی لحظه‌ای به‌اشتباه مشکل دائمی تشخیص داده نشود. مقدارهای پیش‌فرض برای شروع مناسب‌اند.</p>
+    </div>
     <div class="form-container">
         <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php">
             <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
@@ -283,28 +300,38 @@ renderHeader('پایش سرورها', true);
 
             <div class="editor-grid">
                 <div class="form-group">
-                    <label for="timeout_seconds">مهلت پاسخ هر لینک (ثانیه)</label>
+                    <label for="timeout_seconds">چند ثانیه برای پاسخ هر میرور صبر کنیم؟</label>
                     <input type="number" id="timeout_seconds" name="timeout_seconds" min="2" max="30" value="<?= htmlspecialchars($settings['timeout_seconds']) ?>">
-                    <span class="form-hint">بین ۲ تا ۳۰؛ اگر لینک تا این زمان پاسخ ندهد «قطعی» ثبت می‌شود.</span>
+                    <span class="form-hint">اگر لینک در این زمان پاسخ ندهد، یک بار دیگر امتحان می‌شود؛ بین ۲ تا ۳۰ ثانیه.</span>
                 </div>
                 <div class="form-group">
-                    <label for="slow_threshold_ms">آستانهٔ «کند» (میلی‌ثانیه)</label>
+                    <label for="slow_threshold_ms">از چه زمانی پاسخ «کند» حساب شود؟ (میلی‌ثانیه)</label>
                     <input type="number" id="slow_threshold_ms" name="slow_threshold_ms" min="100" max="30000" value="<?= htmlspecialchars($settings['slow_threshold_ms']) ?>">
-                    <span class="form-hint">زمان پاسخ بالاتر از این مقدار، وضعیت «کند» می‌گیرد (آپتایم حساب می‌شود).</span>
+                    <span class="form-hint">مثلاً ۱۲۰۰ یعنی ۱٫۲ ثانیه؛ اگر پاسخ بیشتر طول بکشد، میرور «کند» است ولی هنوز در دسترس محسوب می‌شود.</span>
                 </div>
                 <div class="form-group">
-                    <label for="interval_hours">فاصلهٔ پایش خودکار (ساعت)</label>
-                    <input type="number" id="interval_hours" name="interval_hours" min="1" max="168" value="<?= htmlspecialchars($settings['interval_hours']) ?>">
-                    <span class="form-hint">این بازه فقط برای پایش ارائه‌دهندگان است؛ زمان‌بند سرور باید ساعتی اجرا شود.</span>
+                    <label for="interval_hours">فاصلهٔ اجرای واقعی پایش</label>
+                    <select id="interval_hours" name="interval_hours">
+                        <?php foreach (monitorIntervalChoices() as $choiceHours): ?>
+                            <option value="<?= (int)$choiceHours ?>" <?= $intervalHours === (int)$choiceHours ? 'selected' : '' ?>><?= htmlspecialchars(monitorIntervalLabel((int)$choiceHours)) ?></option>
+                        <?php endforeach; ?>
+                        <?php if (!in_array($intervalHours, monitorIntervalChoices(), true)): ?>
+                            <option value="<?= (int)$intervalHours ?>" selected>مقدار فعلی قدیمی: هر <?= monitorFa($intervalHours) ?> ساعت</option>
+                        <?php endif; ?>
+                    </select>
+                    <span class="form-hint">این یک تنظیم واحد برای چرخهٔ پایش، دستور پیشنهادی Cron و نمایش عمومی است. پس از تغییر بازه و ذخیره، دستور جدید را در cPanel جایگزین کن.</span>
                 </div>
-                <div class="form-group">
+            </div>
+
+            <details class="mon-advanced-settings" style="margin: 16px 0; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-secondary);">
+                <summary style="cursor: pointer; font-weight: 600;">تنظیمات پیشرفته (تاریخچه، هشدارها و تعداد بررسی)</summary>
+                <div class="form-group" style="margin-top: 16px;">
                     <label for="retention_days">مدت نگهداری تاریخچه (روز)</label>
                     <input type="number" id="retention_days" name="retention_days" min="7" max="730" value="<?= htmlspecialchars($settings['retention_days']) ?>">
                     <span class="form-hint">بررسی‌های قدیمی‌تر خودکار حذف می‌شوند.</span>
                 </div>
-            </div>
 
-            <div class="form-group">
+                <div class="form-group">
                 <label class="mon-check-label">
                     <input type="checkbox" name="alert_down" value="1" <?= $settings['alert_down'] === '1' ? 'checked' : '' ?>>
                     هشدار هنگام قطع شدن میرور ارسال شود
@@ -328,14 +355,14 @@ renderHeader('پایش سرورها', true);
             </div>
             <div class="editor-grid">
                 <div class="form-group">
-                    <label for="batch_limit">حداکثر ارائه‌دهنده در هر چرخه</label>
+                    <label for="batch_limit">چند میرور در هر اجرا بررسی شود؟</label>
                     <input type="number" id="batch_limit" name="batch_limit" min="1" max="1000" value="<?= htmlspecialchars($settings['batch_limit']) ?>">
-                    <span class="form-hint">میرورهایی که دیرتر بررسی شده‌اند در اولویت هستند تا فهرست‌های بزرگ از قلم نیفتند.</span>
+                    <span class="form-hint">برای شروع ۲۰۰ مناسب است. اگر میرورها بیشتر باشند، میرورهای بررسی‌نشده یا قدیمی‌تر در اجراهای بعدی نوبت می‌گیرند.</span>
                 </div>
                 <div class="form-group">
-                    <label for="failure_threshold">تعداد خطای متوالی برای ثبت قطعی</label>
+                    <label for="failure_threshold">چند چرخهٔ ناموفق تا اعلام قطعی؟</label>
                     <input type="number" id="failure_threshold" name="failure_threshold" min="1" max="5" value="<?= htmlspecialchars($settings['failure_threshold']) ?>">
-                    <span class="form-hint">برای کاهش قطعی کاذب؛ هر بررسی ناموفق یک بار دیگر هم امتحان می‌شود.</span>
+                    <span class="form-hint">برای کم‌شدن هشدار اشتباه، پیشنهاد می‌شود روی ۲ بماند؛ هر بررسی هم در همان چرخه یک بار دوباره امتحان می‌شود.</span>
                 </div>
             </div>
 
@@ -350,6 +377,8 @@ renderHeader('پایش سرورها', true);
                 <code class="ltr-text mon-key-box" dir="ltr"><?= htmlspecialchars($cronKey !== '' ? $cronKey : 'پس از ذخیرهٔ اولین تنظیمات ساخته می‌شود') ?></code>
                 <span class="form-hint">این کلید را در اختیار سرویس web-cron بگذارید؛ برای امنیت در آدرس بالا قابل تعویض نیست ولی در صورت لو رفتن، با تعریف MONITOR_CRON_KEY در config.php جایگزین می‌شود.</span>
             </div>
+
+            </details>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">ذخیرهٔ تنظیمات</button>
@@ -381,17 +410,17 @@ renderHeader('پایش سرورها', true);
             <tbody>
                 <?php foreach ($incidents as $inc): ?>
                     <tr>
-                        <td><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
-                        <td><?= monitorFaDateTime($inc['started_at']) ?></td>
-                        <td>
+                        <td data-label="میرور"><?= htmlspecialchars(trim($inc['name_fa'] . ' ' . $inc['name_en'], ' ')) ?></td>
+                        <td data-label="شروع"><?= monitorFaDateTime($inc['started_at']) ?></td>
+                        <td data-label="پایان">
                             <?php if ($inc['ended_at']): ?>
                                 <?= monitorFaDateTime($inc['ended_at']) ?>
                             <?php else: ?>
                                 <span class="mon-badge mon-down"><span class="mon-dot"></span>ادامه دارد</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= $inc['duration_s'] !== null ? monitorDurationFa((int)$inc['duration_s']) : '—' ?></td>
-                        <td class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
+                        <td data-label="مدت"><?= $inc['duration_s'] !== null ? monitorDurationFa((int)$inc['duration_s']) : '—' ?></td>
+                        <td data-label="دلیل" class="mon-incident-note"><?= htmlspecialchars($inc['note'] ?? '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -437,13 +466,13 @@ renderHeader('پایش سرورها', true);
                 <tbody>
                     <?php foreach ($recent as $check): ?>
                         <tr>
-                            <td><?= monitorFaDateTime($check['checked_at']) ?></td>
-                            <td><?= htmlspecialchars(trim($check['name_fa'] . ' ' . $check['name_en'], ' ')) ?></td>
-                            <td><span class="mon-badge mon-sm mon-<?= htmlspecialchars($check['status']) ?>"><span class="mon-dot"></span><?= monitorStatusFa($check['status']) ?></span></td>
-                            <td><?= $check['response_ms'] !== null ? monitorFa((int)$check['response_ms']) . ' ms' : '—' ?></td>
-                            <td><?= $check['http_code'] ? monitorFa((int)$check['http_code']) : '—' ?></td>
-                            <td class="ltr-text"><?= htmlspecialchars($check['method']) ?></td>
-                            <td class="mon-incident-note"><?= htmlspecialchars($check['error'] ?? '—') ?></td>
+                            <td data-label="زمان"><?= monitorFaDateTime($check['checked_at']) ?></td>
+                            <td data-label="میرور"><?= htmlspecialchars(trim($check['name_fa'] . ' ' . $check['name_en'], ' ')) ?></td>
+                            <td data-label="نتیجه"><span class="mon-badge mon-sm mon-<?= htmlspecialchars($check['status']) ?>"><span class="mon-dot"></span><?= monitorStatusFa($check['status']) ?></span></td>
+                            <td data-label="زمان پاسخ"><?= $check['response_ms'] !== null ? monitorFa((int)$check['response_ms']) . ' ms' : '—' ?></td>
+                            <td data-label="کد"><?= $check['http_code'] ? monitorFa((int)$check['http_code']) : '—' ?></td>
+                            <td data-label="روش" class="ltr-text"><?= htmlspecialchars($check['method']) ?></td>
+                            <td data-label="توضیح" class="mon-incident-note"><?= htmlspecialchars($check['error'] ?? '—') ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

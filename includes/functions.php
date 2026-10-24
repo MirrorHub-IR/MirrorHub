@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/jalali.php';
+
 /* ============================================================
    Redirect
    ============================================================ */
@@ -376,6 +378,29 @@ function getMirrorCategories($pdo, $mirrorId) {
     return $stmt->fetchAll();
 }
 
+/** Fetch only directly assigned categories for many mirrors in one query. */
+function getMirrorCategoriesMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $map = [];
+    try {
+        $stmt = $pdo->query("SELECT mc.mirror_id, c.*
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            WHERE mc.mirror_id IN ($in)
+            ORDER BY mc.mirror_id, c.sort_order ASC, c.name ASC");
+        foreach ($stmt as $row) {
+            $id = (int)$row['mirror_id'];
+            unset($row['mirror_id']);
+            $map[$id][] = $row;
+        }
+    } catch (Throwable $e) {
+        foreach ($ids as $id) $map[$id] = getMirrorCategories($pdo, $id);
+    }
+    return $map;
+}
+
 function getMirrorCategoryTags($pdo, $mirrorId) {
     $categories = getMirrorCategories($pdo, $mirrorId);
     $parents = [];
@@ -393,6 +418,81 @@ function getMirrorCategoryTags($pdo, $mirrorId) {
         return strcasecmp($a['name'], $b['name']);
     });
     return $all;
+}
+
+/**
+ * Fetch categories and their parent tags for many mirrors in one query.
+ * Listing pages use this instead of N+1 queries for every mirror card.
+ */
+function getMirrorCategoryTagsMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $sql = "SELECT mirror_id, id, name, slug, description, parent_id, type, icon, sort_order
+        FROM (
+            SELECT mc.mirror_id, c.id, c.name, c.slug, c.description, c.parent_id, c.type, c.icon, c.sort_order,
+                   (c.parent_id IS NULL) AS parent_rank
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            WHERE mc.mirror_id IN ($in)
+            UNION
+            SELECT mc.mirror_id, p.id, p.name, p.slug, p.description, p.parent_id, p.type, p.icon, p.sort_order,
+                   (p.parent_id IS NULL) AS parent_rank
+            FROM mirror_categories mc
+            INNER JOIN categories c ON c.id = mc.category_id
+            INNER JOIN categories p ON p.id = c.parent_id
+            WHERE mc.mirror_id IN ($in)
+        ) AS category_tags
+        ORDER BY mirror_id, parent_rank ASC, name ASC";
+    $map = [];
+    try {
+        $stmt = $pdo->query($sql);
+        foreach ($stmt as $row) {
+            $mirrorId = (int)$row['mirror_id'];
+            unset($row['mirror_id'], $row['parent_rank']);
+            $map[$mirrorId][] = $row;
+        }
+    } catch (Throwable $e) {
+        // Listing remains usable on legacy schemas, at the cost of a per-mirror fallback.
+        foreach ($ids as $id) $map[$id] = getMirrorCategoryTags($pdo, $id);
+    }
+    return $map;
+}
+
+/**
+ * Fetch protocol labels for many mirrors in one or two queries.
+ * If the normalized protocol table does not exist, keep compatibility with the legacy mirror.protocol column.
+ */
+function getMirrorProtocolsMap($pdo, array $mirrorIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $mirrorIds), static fn($id) => $id > 0)));
+    if (!$ids) return [];
+    $in = implode(',', $ids);
+    $map = [];
+    if (hasTable($pdo, 'mirror_protocols')) {
+        try {
+            $stmt = $pdo->query("SELECT mirror_id, protocol, custom_label
+                FROM mirror_protocols WHERE mirror_id IN ($in) ORDER BY mirror_id, sort_order ASC, id ASC");
+            foreach ($stmt as $row) {
+                $map[(int)$row['mirror_id']][] = [
+                    'protocol' => $row['protocol'],
+                    'custom_label' => $row['custom_label'] ?? null,
+                ];
+            }
+        } catch (Throwable $e) {
+            $map = [];
+        }
+    }
+
+    $legacy = $pdo->query("SELECT id, protocol FROM mirrors WHERE id IN ($in)");
+    foreach ($legacy as $row) {
+        $id = (int)$row['id'];
+        if (!empty($map[$id]) || empty($row['protocol'])) continue;
+        $map[$id] = [[
+            'protocol' => $row['protocol'] === 'other' ? 'custom' : $row['protocol'],
+            'custom_label' => $row['protocol'] === 'other' ? 'سایر' : null,
+        ]];
+    }
+    return $map;
 }
 
 function setMirrorCategories($pdo, $mirrorId, array $categoryIds) {
@@ -421,10 +521,15 @@ function getRecentMirrors($pdo, $limit = 12) {
     $stmt = $pdo->prepare("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT $limit");
     $stmt->execute();
     $mirrors = $stmt->fetchAll();
-    foreach ($mirrors as &$m) {
-        $m['categories'] = getMirrorCategories($pdo, $m['id']);
-        $m['protocols'] = getMirrorProtocols($pdo, $m['id']);
+    $ids = array_column($mirrors, 'id');
+    $categories = getMirrorCategoryTagsMap($pdo, $ids);
+    $protocols = getMirrorProtocolsMap($pdo, $ids);
+    foreach ($mirrors as &$mirror) {
+        $id = (int)$mirror['id'];
+        $mirror['categories'] = $categories[$id] ?? [];
+        $mirror['protocols'] = $protocols[$id] ?? [];
     }
+    unset($mirror);
     return $mirrors;
 }
 
@@ -507,9 +612,28 @@ function excerpt($text, $length = 120) {
 }
 
 function formatDate($datetime, $format = 'Y/m/d') {
-    if (empty($datetime)) return '-';
-    $ts = strtotime($datetime);
-    return $ts ? date($format, $ts) : '-';
+    return jalaliFormatDate($datetime, (string)$format, true);
+}
+
+/**
+ * Normalize Persian/Arabic variants and digits before matching user search queries.
+ * This is deliberately local and dependency-free.
+ */
+function normalizeSearchQuery($value, $maxLength = 120) {
+    $value = trim((string)$value);
+    $value = strtr($value, [
+        'ي' => 'ی', 'ى' => 'ی', 'ك' => 'ک', 'ۀ' => 'ه', 'ة' => 'ه',
+        'ـ' => '', '‌' => ' ',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+    ]);
+    $value = preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $value) ?? $value;
+    $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+    if (function_exists('mb_substr')) $value = mb_substr($value, 0, (int)$maxLength, 'UTF-8');
+    else $value = substr($value, 0, (int)$maxLength);
+    return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
 }
 
 function currentUrl() {

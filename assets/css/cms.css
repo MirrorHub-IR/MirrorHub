@@ -11,3 +11,28 @@
 .cms-health{margin:1.5rem 0;padding:1rem;border:1px solid var(--border-color);border-radius:14px;background:var(--bg-secondary)}.cms-health-head{display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-bottom:.8rem}.cms-health-head h3{margin:.15rem 0;font-size:1.1rem}.cms-health-row{display:flex;align-items:center;gap:.8rem;padding:.7rem;margin:.45rem 0;border-radius:9px;background:var(--bg-tertiary);flex-wrap:wrap}.cms-health-row strong{flex:1;min-width:120px}.cms-health-note{font-size:.78rem;color:var(--text-muted);margin-top:.8rem}.cms-status{font-size:.78rem;padding:.15rem .55rem;border-radius:999px}.cms-status.good{color:var(--success)}.cms-status.warn{color:var(--warning)}.cms-status.bad{color:var(--danger)}.cms-status.unknown{color:var(--text-secondary)}.cms-latency{font-size:.8rem;color:var(--text-secondary);direction:ltr}.cms-callout{padding:1rem;border-radius:10px;margin:1rem 0;background:var(--bg-secondary)}
 .cms-editor-form{display:grid;gap:1rem}.cms-editor-form label{display:grid;gap:.4rem;color:var(--text-secondary);font-size:.9rem}.cms-editor-form input,.cms-editor-form textarea,.cms-editor-form select{width:100%;border:1px solid var(--border-color);border-radius:8px;padding:.75rem;background:var(--bg-secondary);color:var(--text-primary);font:inherit}.cms-editor-form textarea{resize:vertical;min-height:70px}.cms-markdown-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;direction:ltr;text-align:left;line-height:1.7}.cms-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.cms-help{font-size:.82rem;color:var(--text-muted)}.cms-actions{display:flex;gap:.6rem;flex-wrap:wrap}.cms-inline-form{display:inline-block}.cms-table-slug{display:block;color:var(--text-muted);font-size:.78rem;direction:ltr;text-align:right}
 @media(max-width:850px){.cms-document-layout{grid-template-columns:1fr}.cms-toc{position:static;max-height:none}.cms-article-grid,.cms-form-grid{grid-template-columns:1fr}}
+
+
+/* Responsive overrides for CMS pages are kept local to this page-specific sheet.
+   The common responsive rules live in style.css to avoid a second global request. */
+@media (min-width:681px) and (max-width:850px) {
+    .cms-article-grid,
+    .cms-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width:680px) {
+    .cms-document-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .cms-toc { position: static; max-height: none; }
+    .cms-article-grid,
+    .cms-form-grid { grid-template-columns: minmax(0, 1fr); }
+    .cms-document-header h1 { font-size: clamp(1.45rem, 6vw, 1.9rem); }
+    .cms-prose { max-width: none; font-size: .96rem; overflow-wrap: anywhere; }
+    .cms-prose h1 { font-size: 1.5rem; }
+    .cms-prose h2 { font-size: 1.3rem; }
+    .cms-prose h3 { font-size: 1.12rem; }
+    .cms-prose pre { padding: .75rem; font-size: .78rem; }
+    .cms-health { padding: .75rem; }
+    .cms-health-head { align-items: flex-start; flex-wrap: wrap; }
+    .cms-health-row { gap: .5rem; padding: .6rem; }
+    .cms-health-row strong { flex: 1 1 100%; min-width: 0; }
+    .cms-actions .btn { max-width: 100%; }
+}
