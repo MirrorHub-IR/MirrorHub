@@ -18,6 +18,11 @@ $monitoring = file_get_contents($root . '/includes/monitoring.php') ?: '';
 $repoHealth = file_get_contents($root . '/includes/repository-health.php') ?: '';
 $ignore = file_get_contents($root . '/.gitignore') ?: '';
 $htaccess = file_get_contents($root . '/.htaccess') ?: '';
+$apiRouter = file_get_contents($root . '/api.php') ?: '';
+$apiV1 = file_get_contents($root . '/includes/api-v1.php') ?: '';
+$apiDocs = file_get_contents($root . '/docs/api-v1.md') ?: '';
+$apiExample = file_get_contents($root . '/examples/api-v1.sh') ?: '';
+$apiSpec = json_decode(file_get_contents($root . '/docs/openapi-v1.json') ?: '', true);
 
 $assert(!str_contains($config, "define('DB_NAME', '"), 'DB_NAME must not be hard-coded in config.php.');
 $assert(!str_contains($config, "define('DB_USER', '"), 'DB_USER must not be hard-coded in config.php.');
@@ -54,6 +59,17 @@ $assert(str_contains($searchPage, 'filterCategoryId'), 'Search filters must supp
 $assert(str_contains($searchPage, 'mirror.php?slug='), 'Search results must link to mirror detail pages.');
 $assert(str_contains($homePage, 'mirror.php?slug='), 'Home mirror cards must link to mirror detail pages.');
 $assert(str_contains($categoryPage, 'mirror.php?slug='), 'Category mirror cards must link to mirror detail pages.');
+$assert(str_contains($htaccess, 'api/v1/mirrors'), 'Versioned API routes are missing.');
+$assert(str_contains($htaccess, 'api/v1/contributions'), 'API contribution route is missing.');
+$assert(str_contains($apiRouter, "api_version") && str_contains($apiRouter, "includes/api-v1.php"), 'API v1 dispatcher is missing.');
+$assert(str_contains($apiV1, 'function mirrorhubApiV1'), 'API v1 router is missing.');
+$assert(str_contains($apiV1, 'function mhApiValidateContribution'), 'Contribution validation is missing.');
+$assert(str_contains($apiV1, 'hash_hmac') && str_contains($apiV1, 'CREATE TABLE IF NOT EXISTS api_rate_limits'), 'Submission rate limit is missing.');
+$assert(str_contains($apiV1, "'pending'"), 'API contributions must require moderation.');
+$assert(str_contains($apiV1, 'min(100,$n)'), 'API page size cap is missing.');
+$assert(is_array($apiSpec) && ($apiSpec['openapi'] ?? '') === '3.1.0', 'OpenAPI spec is invalid.');
+$assert(isset($apiSpec['paths']['/mirrors'], $apiSpec['paths']['/contributions']), 'OpenAPI endpoints are incomplete.');
+$assert(str_contains($apiDocs, '۸ تلاش') && str_contains($apiExample, '/api/v1/status'), 'API docs or examples are missing.');
 
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
@@ -92,3 +108,15 @@ if ($failures) {
     exit(1);
 }
 echo "Security and regression smoke tests passed.\n";
+
+
+require_once $root . '/includes/api-v1.php';
+$validApiSuggestion = mhApiValidateContribution([
+    'name_fa' => 'میرور نمونه', 'urls' => ['https://mirror.example.invalid/repo', 'https://mirror.example.invalid/repo'],
+    'protocols' => ['https'], 'phone' => '+989121234567', 'website' => '',
+]);
+$assert($validApiSuggestion['valid'] && count($validApiSuggestion['data']['urls']) === 1, 'API contribution must deduplicate valid URLs.');
+$invalidApiSuggestion = mhApiValidateContribution(['name_fa' => 'bad', 'urls' => ['file:///etc/passwd'], 'protocols' => ['invalid'], 'phone' => '1']);
+$assert(!$invalidApiSuggestion['valid'], 'API contribution must reject unsafe schemes, bad protocols and bad phone numbers.');
+$apiPageCap = mhApiPage(['page' => '9999999', 'per_page' => '9999']);
+$assert($apiPageCap['page'] === 10000 && $apiPageCap['per_page'] === 100, 'API pagination caps are incorrect.');
