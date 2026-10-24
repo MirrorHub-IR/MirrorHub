@@ -4,11 +4,12 @@ require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
 
-const MIRRORHUB_BACKUP_VERSION = 2;
+const MIRRORHUB_BACKUP_VERSION = 3;
 $backupTables = [
     'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
     'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
     'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings',
+    'mirror_repository_health',
 ];
 
 function backupTableExists(PDO $pdo, string $table): bool {
@@ -147,13 +148,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
     try {
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
         $backupVersion = (int)($backup['version'] ?? 0);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, MIRRORHUB_BACKUP_VERSION], true)) {
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
 
         $legacyMissingTables = [];
-        $extendedTables = ['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings'];
+        $legacyTablesByVersion = [
+            1 => ['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'],
+            2 => ['mirror_repository_health'],
+        ];
+        $legacyTables = $legacyTablesByVersion[$backupVersion] ?? [];
 
         // Restore may also be used to bring request_links into an older installation.
         if (!backupTableExists($pdo, 'request_links')) {
@@ -172,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         $columnMap = [];
         foreach ($backupTables as $table) {
             if (!isset($backup['tables'][$table]) || !is_array($backup['tables'][$table]) || !is_array($backup['tables'][$table]['rows'] ?? null)) {
-                if ($backupVersion === 1 && in_array($table, $extendedTables, true)) {
+                if (in_array($table, $legacyTables, true)) {
                     $legacyMissingTables[] = $table;
                     $backup['tables'][$table] = ['present' => false, 'columns' => [], 'rows' => []];
                 } elseif ($table === 'cms_articles') {
@@ -182,6 +187,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
                 }
             }
             if (($backup['tables'][$table]['present'] ?? true) === false) {
+                if (!in_array($table, $legacyTables, true) && $table !== 'cms_articles') {
+                    throw new RuntimeException("جدول «{$table}» در فایل پشتیبان به‌صراحت موجود نیست.");
+                }
+                if (in_array($table, $legacyTables, true) && !in_array($table, $legacyMissingTables, true)) $legacyMissingTables[] = $table;
                 $backup['tables'][$table]['rows'] = [];
             }
             if (!in_array($table, $availableTables, true)) {
@@ -200,10 +209,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
 
         if ($mode === 'replace') {
-            foreach (['mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','cms_articles','request_links','mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
+            foreach (['mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','mirror_repository_health','cms_articles','request_links','mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
                 $pdo->exec("DELETE FROM `$table`");
             }
-            foreach (['users','categories','mirrors','requests','visits','mirror_categories','request_links','mirror_protocols','request_protocols','cms_articles','mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings'] as $table) {
+            foreach (['users','categories','mirrors','requests','visits','mirror_categories','request_links','mirror_protocols','request_protocols','cms_articles','mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','mirror_repository_health'] as $table) {
                 foreach (fetchBackupRows($backup, $table) as $row) insertRow($pdo, $table, $row, $columnMap[$table], true);
             }
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
@@ -297,6 +306,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
                 if (!$exists->fetchColumn()) {
                     $row['request_id'] = $requestId;
                     insertRow($pdo, 'request_links', $row, $columnMap['request_links'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_repository_health') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'پیکربندی سلامت مخزن');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare('SELECT mirror_id FROM mirror_repository_health WHERE mirror_id = ? LIMIT 1');
+                $exists->execute([$mirrorId]);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_repository_health', $row, $columnMap['mirror_repository_health'], false);
                 }
             }
 
@@ -396,7 +416,7 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
     </div>
 
     <div class="alert alert-warning" role="note">
-        فایل پشتیبان شامل تاریخچهٔ پایش و تنظیمات خصوصی اعلان‌ها، از جمله مقادیر محرمانهٔ واردشده در پنل است. فایل را در مخزن عمومی یا فضای اشتراکی منتشر نکنید و پس از انتقال بین سرورها، اعتبارنامه‌های اعلان را بازبینی کنید.
+        فایل پشتیبان شامل تاریخچهٔ پایش، تنظیمات سلامت metadata و تنظیمات خصوصی اعلان‌هاست. آن را محرمانه نگه دارید و پیش از بازیابی در محیط تولید از داده‌های فعلی نسخهٔ جداگانه بگیرید.
     </div>
 
     <div class="backup-actions-grid">
