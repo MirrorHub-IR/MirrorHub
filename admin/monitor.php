@@ -37,9 +37,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($lastRunResult['skipped'])) {
             flash('error', 'چرخه اجرا نشد: ' . $lastRunResult['reason']);
         } else {
-            flash('success', 'چرخهٔ پایش اجرا شد: ' . monitorFa($lastRunResult['checked']) . ' میرور بررسی شد (آنلاین: '
+            $message = 'چرخهٔ HTTP اجرا شد: ' . monitorFa($lastRunResult['checked']) . ' میرور (آنلاین: '
                 . monitorFa($lastRunResult['up']) . '، کند: ' . monitorFa($lastRunResult['slow']) . '، قطع: '
-                . monitorFa($lastRunResult['down']) . ').');
+                . monitorFa($lastRunResult['down']) . ').';
+            if (!empty($lastRunResult['repository_checks'])) {
+                $message .= ' بررسی محتوای مخزن: ' . monitorFa($lastRunResult['repository_checks']) . ' (سالم: '
+                    . monitorFa($lastRunResult['repository_healthy']) . '، قدیمی: '
+                    . monitorFa($lastRunResult['repository_stale']) . '، نامعتبر: '
+                    . monitorFa($lastRunResult['repository_invalid']) . '، خطا: '
+                    . monitorFa($lastRunResult['repository_error']) . ').';
+            }
+            flash('success', $message);
         }
         redirect(SITE_URL . '/admin/monitor.php');
     }
@@ -192,7 +200,8 @@ renderHeader('پایش سرورها', true);
                 <thead>
                     <tr>
                         <th>میرور</th>
-                        <th>وضعیت</th>
+                        <th>وضعیت HTTP</th>
+                        <th>سلامت مخزن</th>
                         <th>پاسخ</th>
                         <th>کد</th>
                         <th>آپتایم ۳۰ روز</th>
@@ -213,7 +222,11 @@ renderHeader('پایش سرورها', true);
                                 <strong><?= htmlspecialchars($names['fa']) ?></strong>
                                 <a class="ltr-text mon-url" href="<?= htmlspecialchars($row['url']) ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars(excerpt($row['url'], 40)) ?></a>
                             </td>
-                            <td data-label="وضعیت"><?= monitorStatusBadge($row) ?></td>
+                            <td data-label="وضعیت HTTP"><?= monitorStatusBadge($row) ?></td>
+                            <td data-label="سلامت مخزن">
+                                <?= monitorRepositoryHealthBadge($row) ?>
+                                <?php if (!empty($row['repository_health_checked_at'])): ?><small class="mon-last-check"><?= monitorTimeAgoFa($row['repository_health_checked_at']) ?></small><?php endif; ?>
+                            </td>
                             <td data-label="پاسخ"><?= $row['last_response_ms'] !== null ? monitorFa((int)$row['last_response_ms']) . ' ms' : '—' ?></td>
                             <td data-label="کد"><?= $row['last_http_code'] ? monitorFa((int)$row['last_http_code']) : '—' ?></td>
                             <td data-label="آپتایم">
@@ -233,7 +246,7 @@ renderHeader('پایش سرورها', true);
                         </tr>
                         <?php if ($row['status'] === 'down' && !empty($row['last_error'])): ?>
                             <tr class="mon-error-row">
-                                <td colspan="8" class="mon-error-cell">
+                                <td colspan="9" class="mon-error-cell">
                                     <?= icon('alert-triangle', 13) ?>
                                     آخرین خطا برای «<?= htmlspecialchars($names['fa']) ?>»:
                                     <span class="ltr-text"><?= htmlspecialchars($row['last_error']) ?></span>
