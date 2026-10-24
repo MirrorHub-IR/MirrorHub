@@ -10,6 +10,8 @@ $assert = static function (bool $condition, string $message) use (&$failures): v
 $config = file_get_contents($root . '/config.php') ?: '';
 $installer = file_get_contents($root . '/install.php') ?: '';
 $backup = file_get_contents($root . '/admin/backup.php') ?: '';
+$monitoring = file_get_contents($root . '/includes/monitoring.php') ?: '';
+$repoHealth = file_get_contents($root . '/includes/repository-health.php') ?: '';
 $ignore = file_get_contents($root . '/.gitignore') ?: '';
 $htaccess = file_get_contents($root . '/.htaccess') ?: '';
 
@@ -33,14 +35,39 @@ $assert(str_contains($categoryAdmin, 'image/webp'), 'Category icon form must adv
 $assert(str_contains($ignore, '/config.local.php'), 'Local config must be git-ignored.');
 $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct access to the local config file.');
 
-foreach (['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings'] as $table) {
+foreach (['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'] as $table) {
     $assert(str_contains($backup, "'" . $table . "'"), 'Backup coverage missing table: ' . $table);
 }
-$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 2'), 'Backup format version was not incremented.');
+$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 3'), 'Backup format version was not incremented.');
 $assert(str_contains($backup, 'legacyMissingTables'), 'Legacy backup safety guard is missing.');
+$assert(str_contains($monitoring, 'mirror_repository_health'), 'Repository-health schema is missing.');
+$assert(str_contains($repoHealth, 'function monitorEvaluateRepositoryHealth'), 'Repository-health evaluator is missing.');
 
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
+require_once $root . '/includes/monitoring.php';
+
+$badPath = monitorNormalizeRepositoryPath('custom', '../private');
+$assert(!$badPath['valid'], 'Repository metadata path traversal must be rejected.');
+$defaultPath = monitorNormalizeRepositoryPath('alpine_index', '');
+$assert($defaultPath['valid'] && $defaultPath['path'] === 'latest-stable/main/x86_64/APKINDEX.tar.gz', 'Alpine default metadata path is wrong.');
+
+$now = strtotime('2026-01-10 12:00:00 UTC');
+$healthyInRelease = monitorEvaluateRepositoryHealth('debian_release', [
+    'http_code' => 200,
+    'response_ms' => 30,
+    'body' => "Origin: Debian\nDate: Sat, 10 Jan 2026 10:00:00 UTC\nValid-Until: Sun, 11 Jan 2026 10:00:00 UTC\n",
+], 168, $now);
+$assert($healthyInRelease['status'] === 'healthy', 'Fresh InRelease metadata should be healthy.');
+
+$expiredInRelease = monitorEvaluateRepositoryHealth('debian_release', [
+    'http_code' => 200,
+    'body' => "Date: Sat, 03 Jan 2026 10:00:00 UTC\nValid-Until: Sun, 04 Jan 2026 10:00:00 UTC\n",
+], 168, $now);
+$assert($expiredInRelease['status'] === 'stale', 'Expired Valid-Until metadata should be stale.');
+
+$missingMetadata = monitorEvaluateRepositoryHealth('arch_db', ['http_code' => 404], 168, $now);
+$assert($missingMetadata['status'] === 'invalid', 'Missing metadata should be invalid, not an HTTP uptime outage.');
 
 $protocols = normalizeProtocols(['https', 'ftp', 'invalid'], []);
 $assert(count($protocols) === 2, 'Protocol normalizer smoke test failed.');
