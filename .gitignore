@@ -14,3 +14,6 @@
 
 # Runtime setup lock (created only on the deployed host)
 /.mirrorhub-installed
+
+# Temporary private config file during atomic setup writes
+/.config.local.php.tmp.*
