@@ -28,6 +28,7 @@ $getSetting = static function (string $key, string $environmentName, string $def
 };
 
 define('DB_HOST', $getSetting('DB_HOST', 'MIRRORHUB_DB_HOST', 'localhost'));
+define('DB_PORT', $getSetting('DB_PORT', 'MIRRORHUB_DB_PORT', '3306'));
 define('DB_NAME', $getSetting('DB_NAME', 'MIRRORHUB_DB_NAME'));
 define('DB_USER', $getSetting('DB_USER', 'MIRRORHUB_DB_USER'));
 define('DB_PASS', $getSetting('DB_PASS', 'MIRRORHUB_DB_PASS'));

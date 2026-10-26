@@ -8,7 +8,7 @@ $assert = static function (bool $condition, string $message) use (&$failures): v
 };
 
 $config = file_get_contents($root . '/config.php') ?: '';
-$installer = file_get_contents($root . '/install.php') ?: '';
+$setup = file_get_contents($root . '/setup.php') ?: '';
 $backup = file_get_contents($root . '/admin/backup.php') ?: '';
 $mirrorDetail = file_get_contents($root . '/mirror.php') ?: '';
 $searchPage = file_get_contents($root . '/search.php') ?: '';
@@ -23,19 +23,34 @@ $apiV1 = file_get_contents($root . '/includes/api-v1.php') ?: '';
 $apiDocs = file_get_contents($root . '/docs/api-v1.md') ?: '';
 $apiExample = file_get_contents($root . '/examples/api-v1.sh') ?: '';
 $apiSpec = json_decode(file_get_contents($root . '/docs/openapi-v1.json') ?: '', true);
+$installation = file_get_contents($root . '/includes/installation.php') ?: '';
+$assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
+$assert(!is_file($root . '/install.php'), 'Legacy install.php must be removed.');
+$assert(str_contains($installation, 'function mirrorhubInstallationStatus'), 'Installation-state detector is missing.');
+$assert(str_contains($installation, "'incomplete'"), 'Incomplete installation state is missing.');
+$assert(str_contains($homePage, 'mirrorhubInstallationStatus'), 'Home page must detect setup state before loading database code.');
+$assert(str_contains($setup, 'CREATE DATABASE IF NOT EXISTS'), 'Setup must attempt to create the target database when permitted.');
+$assert(str_contains($setup, 'mirrorhub_installation'), 'Setup must persist an idempotent installation state.');
+$assert(str_contains($setup, 'ensureMonitorSchema') && str_contains($setup, 'ensureCmsSchema'), 'Setup must create monitoring and CMS schemas.');
+$assert(str_contains($setup, 'mirrorhubSetupWriteConfig'), 'Setup must persist local database configuration.');
+$assert(str_contains($setup, 'password_hash($adminPassword'), 'Setup must hash the administrator password.');
+$assert(str_contains($setup, 'session_regenerate_id(true)'), 'Setup must regenerate the session ID before admin login.');
+$assert(str_contains($setup, '@unlink(__FILE__)'), 'Setup should remove its public installer after success.');
+$assert(str_contains($htaccess, '.mirrorhub-installed'), 'Apache must deny direct reads of the installation lock.');
+$assert(str_contains($config, 'MIRRORHUB_DB_PORT'), 'Database port must be configurable through the environment.');
 
 $assert(!str_contains($config, "define('DB_NAME', '"), 'DB_NAME must not be hard-coded in config.php.');
 $assert(!str_contains($config, "define('DB_USER', '"), 'DB_USER must not be hard-coded in config.php.');
 $assert(!str_contains($config, "define('DB_PASS', '"), 'DB_PASS must not be hard-coded in config.php.');
 $assert(str_contains($config, 'MIRRORHUB_DB_PASS'), 'Database password must be configurable through the environment.');
 $assert(str_contains($config, 'config.local.php'), 'Local config file support is missing.');
-$assert(!str_contains($installer, 'admin123'), 'Installer must not use a default admin password.');
-$assert(str_contains($installer, 'install_csrf_token'), 'Installer CSRF token is missing.');
-$assert(str_contains($installer, 'password_hash($adminPassword'), 'Installer must hash the chosen admin password.');
-$assert(str_contains($installer, 'minlength="12"'), 'Installer must enforce a strong minimum password length.');
-$assert(str_contains($installer, 'pattern="[A-Za-z0-9_.-]{3,50}"'), 'Installer username constraints are missing.');
-$assert(str_contains($installer, 'mb_strlen($adminPassword, \'UTF-8\') < 12'), 'Installer must check password length by characters.');
-$assert(str_contains($installer, 'request_links'), 'Fresh installations must create request_links.');
+$assert(!str_contains($setup, 'admin123'), 'Setup must not use a default admin password.');
+$assert(str_contains($setup, 'setup_csrf_token'), 'Installer CSRF token is missing.');
+$assert(str_contains($setup, 'password_hash($adminPassword'), 'Installer must hash the chosen admin password.');
+$assert(str_contains($setup, 'minlength="12"'), 'Installer must enforce a strong minimum password length.');
+$assert(str_contains($setup, 'pattern="[A-Za-z0-9_.-]{3,50}"'), 'Installer username constraints are missing.');
+$assert(str_contains($setup, 'mb_strlen($adminPassword, \'UTF-8\') < 12'), 'Installer must check password length by characters.');
+$assert(str_contains($setup, 'request_links'), 'Fresh installations must create request_links.');
 $functions = file_get_contents($root . '/includes/functions.php') ?: '';
 $categoryAdmin = file_get_contents($root . '/admin/categories.php') ?: '';
 $assert(!str_contains($functions, 'image/svg+xml'), 'Category icon upload must not accept SVG.');
@@ -105,13 +120,6 @@ $assert(count($protocols) === 2, 'Protocol normalizer smoke test failed.');
 $escaped = cmsInline('<script>alert(1)</script>');
 $assert(str_contains($escaped, '&lt;script&gt;'), 'CMS inline renderer must escape raw HTML.');
 
-if ($failures) {
-    fwrite(STDERR, "Smoke tests failed:\n - " . implode("\n - ", $failures) . "\n");
-    exit(1);
-}
-echo "Security and regression smoke tests passed.\n";
-
-
 require_once $root . '/includes/api-v1.php';
 $validApiSuggestion = mhApiValidateContribution([
     'name_fa' => 'میرور نمونه', 'urls' => ['https://mirror.example.invalid/repo', 'https://mirror.example.invalid/repo'],
@@ -120,5 +128,11 @@ $validApiSuggestion = mhApiValidateContribution([
 $assert($validApiSuggestion['valid'] && count($validApiSuggestion['data']['urls']) === 1, 'API contribution must deduplicate valid URLs.');
 $invalidApiSuggestion = mhApiValidateContribution(['name_fa' => 'bad', 'urls' => ['file:///etc/passwd'], 'protocols' => ['invalid'], 'phone' => '1']);
 $assert(!$invalidApiSuggestion['valid'], 'API contribution must reject unsafe schemes, bad protocols and bad phone numbers.');
-$apiPageCap = mhApiPage(['page' => '9999999', 'per_page' => '9999']);
+$apiPageCap = mhApiPage(['page' => '999999', 'per_page' => '999']);
 $assert($apiPageCap['page'] === 10000 && $apiPageCap['per_page'] === 100, 'API pagination caps are incorrect.');
+
+if ($failures) {
+    fwrite(STDERR, "Smoke tests failed:\n - " . implode("\n - ", $failures) . "\n");
+    exit(1);
+}
+echo "Security and regression smoke tests passed.\n";

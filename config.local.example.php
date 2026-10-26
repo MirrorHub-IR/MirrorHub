@@ -6,6 +6,7 @@
  */
 return [
     'DB_HOST' => 'localhost',
+    'DB_PORT' => '3306',
     'DB_NAME' => 'CHANGE_ME_DATABASE_NAME',
     'DB_USER' => 'CHANGE_ME_DATABASE_USER',
     'DB_PASS' => 'CHANGE_ME_WITH_A_NEW_DATABASE_PASSWORD',

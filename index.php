@@ -1,4 +1,18 @@
 <?php
+require_once __DIR__ . '/includes/installation.php';
+
+$installationStatus = mirrorhubInstallationStatus();
+if (in_array($installationStatus, ['not_installed', 'incomplete'], true)) {
+    header('Location: ' . mirrorhubSetupUrl(), true, 302);
+    exit;
+}
+if ($installationStatus === 'unavailable') {
+    http_response_code(503);
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Retry-After: 60');
+    echo '<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>اتصال پایگاه داده</title><body style="font-family:Tahoma,sans-serif;background:#101712;color:#edf6ee;padding:3rem;line-height:2"><h1>MirrorHub موقتاً در دسترس نیست</h1><p>تنظیمات اتصال پایگاه داده بررسی‌پذیر نیست. دسترسی MySQL/MariaDB و اطلاعات استقرار را بررسی کنید. برای جلوگیری از نصب اشتباه، به نصب‌کننده هدایت نشدید.</p></body></html>';
+    exit;
+}
 require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/layout.php';
