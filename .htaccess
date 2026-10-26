@@ -47,7 +47,7 @@ FileETag MTime Size
 
 # Local secrets must never be served directly.
 <IfModule mod_authz_core.c>
-    <FilesMatch "^(config\.local\.php|\.env(?:\..*)?)$">
+    <FilesMatch "^(config\.local\.php|\.env(?:\..*)?|\.mirrorhub-installed)$">
         Require all denied
     </FilesMatch>
 </IfModule>

@@ -11,3 +11,6 @@
 
 # User-uploaded content (keep uploaded assets out of Git)
 /uploads/
+
+# Runtime setup lock (created only on the deployed host)
+/.mirrorhub-installed

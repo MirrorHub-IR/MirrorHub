@@ -46,9 +46,9 @@ See the detailed Persian guide in [docs/installation.fa.md](docs/installation.fa
 
 1. Provide a PHP 8.2+ web environment, MySQL/MariaDB database, and Apache rewrite support.
 2. Put the repository files under the intended web root.
-3. Copy config.local.example.php to config.local.php and fill in the database credentials and the exact public SITE_URL, including any subdirectory.
-4. Visit install.php, create an administrator account with a password of at least 12 characters, and finish setup.
-5. Remove or block public access to install.php immediately after installation.
+3. Open the site root; a fresh deployment redirects to /setup.php automatically.
+4. Enter the MySQL/MariaDB connection details, the public site URL (including any subdirectory), and a new administrator account with a password of at least 12 characters.
+5. Setup tests the connection, prepares the application schema, saves the private configuration, locks completed installation, and signs the administrator in. On hosts that permit it, setup.php removes itself after completion.
 6. Configure the provider categories, add mirrors, select repository-health profiles where applicable, and configure a real server cron for monitoring.
 
 Do not commit config.local.php, real credentials, bot tokens, backup exports, or production logs.
