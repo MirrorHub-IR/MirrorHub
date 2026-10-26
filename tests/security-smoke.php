@@ -128,7 +128,7 @@ $validApiSuggestion = mhApiValidateContribution([
 $assert($validApiSuggestion['valid'] && count($validApiSuggestion['data']['urls']) === 1, 'API contribution must deduplicate valid URLs.');
 $invalidApiSuggestion = mhApiValidateContribution(['name_fa' => 'bad', 'urls' => ['file:///etc/passwd'], 'protocols' => ['invalid'], 'phone' => '1']);
 $assert(!$invalidApiSuggestion['valid'], 'API contribution must reject unsafe schemes, bad protocols and bad phone numbers.');
-$apiPageCap = mhApiPage(['page' => '9999999', 'per_page' => '9999']);
+$apiPageCap = mhApiPage(['page' => '999999', 'per_page' => '999']);
 $assert($apiPageCap['page'] === 10000 && $apiPageCap['per_page'] === 100, 'API pagination caps are incorrect.');
 
 if ($failures) {
