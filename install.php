@@ -4,8 +4,23 @@ require_once 'config.php';
 $message = '';
 $error = '';
 $installed = false;
+$showSetupForm = false;
+
+if (!isset($_SESSION['mirrorhub_install_csrf']) || !is_string($_SESSION['mirrorhub_install_csrf'])) {
+    $_SESSION['mirrorhub_install_csrf'] = bin2hex(random_bytes(32));
+}
+$installCsrfToken = $_SESSION['mirrorhub_install_csrf'];
+$setupRequested = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    && ($_POST['install_action'] ?? '') === 'install';
 
 try {
+    if (DB_NAME === '' || DB_USER === '' || DB_PASS === '') {
+        throw new PDOException('Database credentials are not configured.');
+    }
+    if (!preg_match('/^[A-Za-z0-9_]+$/', DB_NAME)) {
+        throw new PDOException('Invalid database name.');
+    }
+
     $dsn = "mysql:host=" . DB_HOST . ";charset=" . DB_CHARSET;
     $pdo = new PDO($dsn, DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     
@@ -17,9 +32,29 @@ try {
 
     $stmt = $pdo->query("SHOW TABLES LIKE 'users'");
     if ($stmt->fetch()) {
-        $error = "پایگاه داده قبلاً نصب شده است. در صورت نیاز به نصب مجدد، جداول را به‌صورت دستی حذف کنید.";
+        $error = "پایگاه داده قبلاً نصب شده است. نصب‌کننده فقط برای راه‌اندازی اولیه در دسترس است.";
+    } elseif (!$setupRequested) {
+        $showSetupForm = true;
     } else {
-        $pdo->exec("
+        $adminUsername = trim((string)($_POST['admin_username'] ?? ''));
+        $adminPassword = (string)($_POST['admin_password'] ?? '');
+        $confirmPassword = (string)($_POST['confirm_password'] ?? '');
+        $submittedToken = (string)($_POST['install_csrf_token'] ?? '');
+
+        if (!hash_equals($installCsrfToken, $submittedToken)) {
+            $error = 'درخواست نصب معتبر نیست. صفحه را تازه کنید و دوباره تلاش کنید.';
+            $showSetupForm = true;
+        } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $adminUsername)) {
+            $error = 'نام کاربری باید ۳ تا ۵۰ نویسه و شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد.';
+            $showSetupForm = true;
+        } elseif (mb_strlen($adminPassword, 'UTF-8') < 12) {
+            $error = 'رمز عبور مدیر باید حداقل ۱۲ نویسه داشته باشد.';
+            $showSetupForm = true;
+        } elseif ($adminPassword !== $confirmPassword) {
+            $error = 'تکرار رمز عبور با رمز اصلی یکسان نیست.';
+            $showSetupForm = true;
+        } else {
+            $pdo->exec("
             CREATE TABLE `users` (
                 `id` INT AUTO_INCREMENT PRIMARY KEY,
                 `username` VARCHAR(50) NOT NULL UNIQUE,
@@ -95,6 +130,16 @@ try {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `request_links` (
+            `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `request_id` INT NOT NULL,
+            `url` VARCHAR(1000) NOT NULL,
+            `sort_order` INT DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_request_links_request` (`request_id`, `sort_order`),
+            FOREIGN KEY (`request_id`) REFERENCES `requests`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         $pdo->exec("CREATE TABLE IF NOT EXISTS `mirror_protocols` (
                 `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
                 `mirror_id` INT NOT NULL,
@@ -128,21 +173,27 @@ try {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        $adminPass = password_hash('admin123', PASSWORD_DEFAULT);
+        $adminPassHash = password_hash($adminPassword, PASSWORD_DEFAULT);
         $stmt = $pdo->prepare("INSERT INTO `users` (`username`, `password_hash`, `role`) VALUES (?, ?, 'admin')");
-        $stmt->execute(['admin', $adminPass]);
+        $stmt->execute([$adminUsername, $adminPassHash]);
 
         $stmt = $pdo->prepare("INSERT INTO `categories` (`name`, `slug`, `description`, `type`, `sort_order`) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute(['دسته‌بندی عمومی', 'general', 'دسته‌بندی پیش‌فرض برای میرورها', 'software', 1]);
 
         $installed = true;
-        $message = "نصب با موفقیت انجام شد!";
+        $message = "نصب با موفقیت انجام شد. حساب مدیر ساخته شد: " . $adminUsername;
+        unset($_SESSION['mirrorhub_install_csrf']);
+        }
     }
 
-    // جداول سامانهٔ پایش میرورها (ایمن در برابر اجرای چندباره)
-    ensureMonitorSchema($pdo);
+    if ($installed) {
+        // جداول سامانهٔ پایش میرورها فقط پس از تأیید و اجرای نصب ساخته می‌شوند.
+        ensureMonitorSchema($pdo);
+    }
 } catch (PDOException $e) {
-    $error = "خطا در اتصال یا اجرای کوئری‌ها: " . $e->getMessage();
+    $error = ENVIRONMENT === 'development'
+        ? "خطا در اتصال یا اجرای کوئری‌ها: " . $e->getMessage()
+        : "اتصال به پایگاه داده یا اجرای نصب ناموفق بود. تنظیمات پایگاه داده را بررسی کنید.";
 }
 ?>
 <!DOCTYPE html>
@@ -151,7 +202,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نصب MirrorHub</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap">
+    <!-- نصب‌کننده مستقل است و برای نمایش به CDN خارجی وابسته نیست. -->
     <style>
         :root {
             --bg-primary: #0e1410;
@@ -168,7 +219,7 @@ try {
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            font-family: Tahoma, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             display: flex;
@@ -264,14 +315,31 @@ try {
         <h1>نصب MirrorHub</h1>
         <?php if ($installed): ?>
             <div class="success"><?= htmlspecialchars($message) ?></div>
-            <div class="credentials">
-                <p>نام کاربری مدیر: <strong>admin</strong></p>
-                <p>رمز عبور مدیر: <strong>admin123</strong></p>
-            </div>
+            <p class="info"><?= htmlspecialchars($message) ?></p>
             <a href="admin/login.php" class="btn">ورود به پنل مدیریت</a>
-            <p class="info">لطفاً پس از ورود، رمز عبور را تغییر دهید و این فایل را حذف کنید.</p>
+            <p class="info">پس از نصب موفق، فایل install.php را از مسیر عمومی حذف کنید یا دسترسی مستقیم به آن را در سرور مسدود کنید.</p>
+        <?php elseif ($showSetupForm): ?>
+            <?php if ($error): ?><div class="error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+            <p class="info">برای ایجاد حساب مدیر، یک نام کاربری و رمز عبور منحصربه‌فرد انتخاب کنید. رمز عبور حداقل ۱۲ نویسه باشد.</p>
+            <form method="post" action="install.php" autocomplete="off">
+                <input type="hidden" name="install_csrf_token" value="<?= htmlspecialchars($installCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-group">
+                    <label for="admin_username">نام کاربری مدیر</label>
+                    <input type="text" id="admin_username" name="admin_username" minlength="3" maxlength="50" pattern="[A-Za-z0-9_.-]{3,50}" required autocomplete="username" dir="ltr">
+                </div>
+                <div class="form-group">
+                    <label for="admin_password">رمز عبور مدیر</label>
+                    <input type="password" id="admin_password" name="admin_password" minlength="12" required autocomplete="new-password" dir="ltr">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">تکرار رمز عبور</label>
+                    <input type="password" id="confirm_password" name="confirm_password" minlength="12" required autocomplete="new-password" dir="ltr">
+                </div>
+                <button type="submit" class="btn" name="install_action" value="install">نصب و ساخت حساب مدیر</button>
+            </form>
         <?php elseif ($error): ?>
-            <div class="error"><?= htmlspecialchars($error) ?></div>
+            <div class="error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+            <p class="info">اگر نصب قبلاً انجام شده، فایل install.php را از مسیر عمومی حذف کنید.</p>
         <?php else: ?>
             <div class="error">خطای نامشخص در هنگام نصب.</div>
         <?php endif; ?>

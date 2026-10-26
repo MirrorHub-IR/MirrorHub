@@ -1,0 +1,136 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MirrorHub Public API",
+    "version": "1.0.0",
+    "description": "Public API for mirror discovery, repository status, and moderated suggestions. Metadata freshness does not prove cryptographic signature validity."
+  },
+  "servers": [
+    {
+      "url": "https://mirrorhub.ir/beta/api/v1",
+      "description": "Example beta installation. Adjust for other deployments."
+    }
+  ],
+  "paths": {
+    "/mirrors": {
+      "get": {
+        "summary": "List and filter active mirrors",
+        "parameters": [
+          {"name":"q","in":"query","schema":{"type":"string","maxLength":120}},
+          {"name":"category","in":"query","description":"Category slug or numeric ID","schema":{"type":"string","maxLength":120}},
+          {"name":"category_id","in":"query","schema":{"type":"integer","minimum":1}},
+          {"name":"protocol","in":"query","schema":{"type":"string","enum":["https","http","ftp","rsync","custom"]}},
+          {"name":"http_status","in":"query","schema":{"type":"string","enum":["up","slow","down","unknown"]}},
+          {"name":"repository_health","in":"query","schema":{"type":"string","enum":["healthy","stale","invalid","error","unknown","not_configured"]}},
+          {"name":"page","in":"query","schema":{"type":"integer","minimum":1,"maximum":10000,"default":1}},
+          {"name":"per_page","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        ],
+        "responses": {
+          "200": {"description":"Paginated mirror list","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SuccessResponse"}}}},
+          "400": {"$ref":"#/components/responses/BadRequest"}
+        }
+      }
+    },
+    "/mirrors/{slug}": {
+      "get": {
+        "summary":"Get one active mirror",
+        "parameters":[{"name":"slug","in":"path","required":true,"schema":{"type":"string"}}],
+        "responses":{"200":{"description":"Mirror details"},"404":{"$ref":"#/components/responses/NotFound"}}
+      }
+    },
+    "/categories": {
+      "get": {
+        "summary":"List categories",
+        "parameters":[
+          {"name":"type","in":"query","schema":{"type":"string","enum":["software","provider"]}},
+          {"name":"parent_id","in":"query","schema":{"type":"integer","minimum":0}},
+          {"name":"page","in":"query","schema":{"type":"integer","minimum":1,"default":1}},
+          {"name":"per_page","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        ],
+        "responses":{"200":{"description":"Category list"}}
+      }
+    },
+    "/stats": {
+      "get":{"summary":"Public site statistics","responses":{"200":{"description":"Statistics"}}}
+    },
+    "/status": {
+      "get":{
+        "summary":"Monitoring summary and provider mirrors",
+        "parameters":[
+          {"name":"page","in":"query","schema":{"type":"integer","minimum":1,"default":1}},
+          {"name":"per_page","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        ],
+        "responses":{"200":{"description":"Status snapshot"}}
+      }
+    },
+    "/status/{slug}/history": {
+      "get":{
+        "summary":"Recent HTTP checks and daily uptime",
+        "parameters":[{"name":"slug","in":"path","required":true,"schema":{"type":"string"}},{"name":"per_page","in":"query","schema":{"type":"integer","minimum":1,"maximum":50,"default":20}}],
+        "responses":{"200":{"description":"History"},"404":{"$ref":"#/components/responses/NotFound"}}
+      }
+    },
+    "/contributions": {
+      "post":{
+        "summary":"Submit a mirror suggestion for moderation",
+        "description":"This endpoint never publishes a mirror. Limited to 8 attempts per hour per IP. Keep the website honeypot field empty.",
+        "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Contribution"}}}},
+        "responses":{
+          "201":{"description":"Queued for admin review"},
+          "202":{"description":"Accepted honeypot response"},
+          "400":{"$ref":"#/components/responses/BadRequest"},
+          "413":{"description":"Payload too large"},
+          "415":{"description":"JSON required"},
+          "422":{"description":"Validation failed"},
+          "429":{"description":"Rate limit exceeded"},
+          "503":{"description":"Temporarily unavailable"}
+        }
+      }
+    },
+    "/openapi.json": {
+      "get":{"summary":"This OpenAPI definition","responses":{"200":{"description":"OpenAPI 3.1 JSON"}}}
+    }
+  },
+  "components": {
+    "schemas": {
+      "SuccessResponse": {
+        "type":"object",
+        "required":["success","data","meta"],
+        "properties":{
+          "success":{"type":"boolean","const":true},
+          "data":{},
+          "meta":{"type":"object","properties":{"api_version":{"type":"string"},"generated_at":{"type":"string","format":"date-time"},"page":{"type":"integer"},"per_page":{"type":"integer"},"total":{"type":"integer"},"pages":{"type":"integer"}}}
+        }
+      },
+      "ErrorResponse": {
+        "type":"object",
+        "required":["success","error","meta"],
+        "properties":{
+          "success":{"type":"boolean","const":false},
+          "data":{"type":"null"},
+          "error":{"type":"object","properties":{"code":{"type":"string"},"message":{"type":"string"},"details":{"type":"object"}}},
+          "meta":{"type":"object"}
+        }
+      },
+      "Contribution": {
+        "type":"object",
+        "required":["name_fa","urls","protocols","phone"],
+        "properties":{
+          "name_fa":{"type":"string","minLength":1,"maxLength":120},
+          "name_en":{"type":"string","maxLength":120},
+          "urls":{"type":"array","minItems":1,"maxItems":10,"items":{"type":"string","format":"uri","maxLength":1000}},
+          "protocols":{"type":"array","minItems":1,"maxItems":5,"items":{"type":"string","enum":["https","http","ftp","rsync","custom"]}},
+          "custom_protocols":{"type":"array","items":{"type":"string","maxLength":100}},
+          "description":{"type":"string","maxLength":1000},
+          "phone":{"type":"string","minLength":10,"maxLength":15},
+          "email":{"type":"string","format":"email","maxLength":190},
+          "website":{"type":"string","maxLength":300,"description":"Anti-bot honeypot; leave empty."}
+        }
+      }
+    },
+    "responses": {
+      "BadRequest":{"description":"Invalid input","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}},
+      "NotFound":{"description":"Resource not found","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorResponse"}}}}
+    }
+  }
+}

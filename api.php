@@ -3,6 +3,12 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/monitoring.php';
 
+if ((string)($_GET['api_version'] ?? '') === '1') {
+    require_once 'includes/api-v1.php';
+    mirrorhubApiV1($pdo);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -117,6 +123,12 @@ try {
                     'uptime_percent' => $row['uptime_percent'] !== null ? (float)$row['uptime_percent'] : null,
                     'down_since'     => $row['down_since'],
                     'last_checked_at'=> $row['last_checked_at'],
+                    'repository_health_profile' => $row['repository_health_profile'] ?? 'http_only',
+                    'repository_health_status' => $row['repository_health_status'] ?? 'not_configured',
+                    'repository_health_checked_at' => $row['repository_health_checked_at'] ?? null,
+                    'repository_metadata_date' => $row['repository_metadata_date'] ?? null,
+                    'repository_age_seconds' => isset($row['repository_age_seconds']) ? (int)$row['repository_age_seconds'] : null,
+                    'repository_health_message' => $row['repository_health_message'] ?? null,
                 ];
             }, monitorMirrorRows($pdo));
             $response['success'] = true;

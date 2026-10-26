@@ -4,11 +4,26 @@ require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
 
-const MIRRORHUB_BACKUP_VERSION = 1;
-$backupTables = ['users','categories','mirrors','mirror_categories','requests','visits','mirror_protocols','request_protocols','cms_articles'];
+const MIRRORHUB_BACKUP_VERSION = 3;
+$backupTables = [
+    'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
+    'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
+    'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings',
+    'mirror_repository_health',
+];
+
+function backupTableExists(PDO $pdo, string $table): bool {
+    if (!preg_match('/^[a-z_]+$/', $table)) return false;
+    $stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+    $stmt->execute([$table]);
+    return (bool)$stmt->fetchColumn();
+}
 
 function tableColumns(PDO $pdo, string $table): array {
-    $rows = $pdo->query("SHOW COLUMNS FROM $table")->fetchAll(PDO::FETCH_ASSOC);
+    if (!preg_match('/^[a-z_]+$/', $table)) {
+        throw new RuntimeException('نام جدول نامعتبر است.');
+    }
+    $rows = $pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
     return array_column($rows, 'Field');
 }
 
@@ -64,15 +79,27 @@ if (($_GET['action'] ?? '') === 'export') {
         'version' => MIRRORHUB_BACKUP_VERSION,
         'exported_at' => date('c'),
         'site' => SITE_NAME,
-        'database' => DB_NAME,
         'tables' => [],
     ];
 
-    foreach ($backupTables as $table) {
-        $payload['tables'][$table] = [
-            'columns' => tableColumns($pdo, $table),
-            'rows' => $pdo->query("SELECT * FROM $table")->fetchAll(PDO::FETCH_ASSOC),
-        ];
+    // Use a consistent snapshot so related tables are not exported from different points in time.
+    $pdo->beginTransaction();
+    try {
+        foreach ($backupTables as $table) {
+            if (!backupTableExists($pdo, $table)) {
+                $payload['tables'][$table] = ['present' => false, 'columns' => [], 'rows' => []];
+                continue;
+            }
+            $payload['tables'][$table] = [
+                'present' => true,
+                'columns' => tableColumns($pdo, $table),
+                'rows' => $pdo->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_ASSOC),
+            ];
+        }
+        $pdo->commit();
+    } catch (Throwable $exportError) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exportError;
     }
 
     $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
@@ -120,34 +147,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
 
     try {
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || (int)($backup['version'] ?? 0) !== MIRRORHUB_BACKUP_VERSION) {
+        $backupVersion = (int)($backup['version'] ?? 0);
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
 
+        $legacyMissingTables = [];
+        $legacyTablesByVersion = [
+            1 => ['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'],
+            2 => ['mirror_repository_health'],
+        ];
+        $legacyTables = $legacyTablesByVersion[$backupVersion] ?? [];
+
+        // Restore may also be used to bring request_links into an older installation.
+        if (!backupTableExists($pdo, 'request_links')) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `request_links` (
+                `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+                `request_id` INT NOT NULL,
+                `url` VARCHAR(1000) NOT NULL,
+                `sort_order` INT DEFAULT 0,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX `idx_request_links_request` (`request_id`, `sort_order`),
+                FOREIGN KEY (`request_id`) REFERENCES `requests`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        }
+
         $availableTables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         $columnMap = [];
         foreach ($backupTables as $table) {
-            if (!in_array($table, $availableTables, true)) throw new RuntimeException("جدول «{$table}» در پایگاه داده فعلی موجود نیست.");
-            if (!isset($backup['tables'][$table]) || !is_array($backup['tables'][$table]['rows'] ?? null)) {
-                // Backward compatibility: backups created before the CMS have no article table.
-                if ($table === 'cms_articles') {
-                    $backup['tables'][$table] = ['columns' => [], 'rows' => []];
+            if (!isset($backup['tables'][$table]) || !is_array($backup['tables'][$table]) || !is_array($backup['tables'][$table]['rows'] ?? null)) {
+                if (in_array($table, $legacyTables, true)) {
+                    $legacyMissingTables[] = $table;
+                    $backup['tables'][$table] = ['present' => false, 'columns' => [], 'rows' => []];
+                } elseif ($table === 'cms_articles') {
+                    $backup['tables'][$table] = ['present' => false, 'columns' => [], 'rows' => []];
                 } else {
                     throw new RuntimeException("فایل پشتیبان ناقص یا نامعتبر است: «{$table}».");
                 }
             }
+            if (($backup['tables'][$table]['present'] ?? true) === false) {
+                if (!in_array($table, $legacyTables, true) && $table !== 'cms_articles') {
+                    throw new RuntimeException("جدول «{$table}» در فایل پشتیبان به‌صراحت موجود نیست.");
+                }
+                if (in_array($table, $legacyTables, true) && !in_array($table, $legacyMissingTables, true)) $legacyMissingTables[] = $table;
+                $backup['tables'][$table]['rows'] = [];
+            }
+            if (!in_array($table, $availableTables, true)) {
+                throw new RuntimeException("جدول «{$table}» در پایگاه داده فعلی موجود نیست.");
+            }
             $columnMap[$table] = tableColumns($pdo, $table);
+        }
+
+        // Old backups omit monitoring history and multi-link requests. Never erase live data
+        // through "replace" when the selected archive cannot restore those newer tables.
+        if ($mode === 'replace' && $legacyMissingTables) {
+            throw new RuntimeException('این فایل پشتیبان قدیمی است و تمام جدول‌های نسخهٔ فعلی را ندارد؛ برای جلوگیری از حذف تاریخچه، بازیابی جایگزینی لغو شد. برای بازیابی قدیمی از حالت «حفظ اطلاعات فعلی» استفاده کنید.');
         }
 
         $pdo->beginTransaction();
         $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
 
         if ($mode === 'replace') {
-            foreach (['cms_articles','mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
-                $pdo->exec("DELETE FROM $table");
+            foreach (['mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','mirror_repository_health','cms_articles','request_links','mirror_protocols','request_protocols','mirror_categories','visits','requests','mirrors','categories','users'] as $table) {
+                $pdo->exec("DELETE FROM `$table`");
             }
-            foreach (['users','categories','mirrors','requests','visits','mirror_categories','mirror_protocols','request_protocols','cms_articles'] as $table) {
+            foreach (['users','categories','mirrors','requests','visits','mirror_categories','request_links','mirror_protocols','request_protocols','cms_articles','mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','mirror_repository_health'] as $table) {
                 foreach (fetchBackupRows($backup, $table) as $row) insertRow($pdo, $table, $row, $columnMap[$table], true);
             }
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
@@ -232,6 +297,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
                 }
             }
 
+            foreach (fetchBackupRows($backup, 'request_links') as $row) {
+                $requestId = mappedId($maps['requests'], $row['request_id'] ?? null, 'لینک درخواست');
+                if (!$requestId) continue;
+                $url = (string)($row['url'] ?? '');
+                $exists = $pdo->prepare('SELECT id FROM request_links WHERE request_id = ? AND url = ? LIMIT 1');
+                $exists->execute([$requestId, $url]);
+                if (!$exists->fetchColumn()) {
+                    $row['request_id'] = $requestId;
+                    insertRow($pdo, 'request_links', $row, $columnMap['request_links'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_repository_health') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'پیکربندی سلامت مخزن');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare('SELECT mirror_id FROM mirror_repository_health WHERE mirror_id = ? LIMIT 1');
+                $exists->execute([$mirrorId]);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_repository_health', $row, $columnMap['mirror_repository_health'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_checks') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'تاریخچهٔ بررسی میرور');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare("SELECT id FROM mirror_checks
+                    WHERE mirror_id = ? AND checked_at = ? AND status = ?
+                    AND response_ms <=> ? AND http_code <=> ? LIMIT 1");
+                $exists->execute([$mirrorId, $row['checked_at'] ?? null, $row['status'] ?? '', $row['response_ms'] ?? null, $row['http_code'] ?? null]);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_checks', $row, $columnMap['mirror_checks'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_status') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'وضعیت میرور');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare('SELECT mirror_id FROM mirror_status WHERE mirror_id = ? LIMIT 1');
+                $exists->execute([$mirrorId]);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_status', $row, $columnMap['mirror_status'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_daily_stats') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'آمار روزانهٔ میرور');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare('SELECT mirror_id FROM mirror_daily_stats WHERE mirror_id = ? AND day = ? LIMIT 1');
+                $exists->execute([$mirrorId, $row['day'] ?? null]);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_daily_stats', $row, $columnMap['mirror_daily_stats'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'mirror_incidents') as $row) {
+                $mirrorId = mappedId($maps['mirrors'], $row['mirror_id'] ?? null, 'رخداد میرور');
+                if (!$mirrorId) continue;
+                $exists = $pdo->prepare("SELECT id FROM mirror_incidents
+                    WHERE mirror_id = ? AND started_at = ? AND status = ? LIMIT 1");
+                $exists->execute([$mirrorId, $row['started_at'] ?? null, $row['status'] ?? '']);
+                if (!$exists->fetchColumn()) {
+                    $row['mirror_id'] = $mirrorId;
+                    insertRow($pdo, 'mirror_incidents', $row, $columnMap['mirror_incidents'], false);
+                }
+            }
+
+            foreach (fetchBackupRows($backup, 'monitor_settings') as $row) {
+                $settingKey = (string)($row['skey'] ?? '');
+                if ($settingKey === '') continue;
+                $exists = $pdo->prepare('SELECT skey FROM monitor_settings WHERE skey = ? LIMIT 1');
+                $exists->execute([$settingKey]);
+                if (!$exists->fetchColumn()) {
+                    insertRow($pdo, 'monitor_settings', $row, $columnMap['monitor_settings'], false);
+                }
+            }
+
             // CMS articles share the same category and user records as the rest of MirrorHub.
             foreach (fetchBackupRows($backup, 'cms_articles') as $row) {
                 $slug = (string)($row['slug'] ?? '');
@@ -268,6 +413,10 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
             <h1 class="section-title">پشتیبان‌گیری و بازیابی</h1>
             <p class="section-desc">از تمام داده‌های MirrorHub یک فایل JSON نسخه‌دار بسازید یا همان ساختار را دوباره وارد کنید.</p>
         </div>
+    </div>
+
+    <div class="alert alert-warning" role="note">
+        فایل پشتیبان شامل تاریخچهٔ پایش، تنظیمات سلامت metadata و تنظیمات خصوصی اعلان‌هاست. آن را محرمانه نگه دارید و پیش از بازیابی در محیط تولید از داده‌های فعلی نسخهٔ جداگانه بگیرید.
     </div>
 
     <div class="backup-actions-grid">
