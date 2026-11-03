@@ -10,24 +10,24 @@ renderHeader('راهنمای مدیریت', true);
 <div class="admin-guide-page">
     <section class="admin-guide-hero">
         <div class="admin-guide-hero-copy">
-            <span class="admin-guide-eyebrow"><?= icon('book-open-check', 15) ?> مرکز راهنمای مدیریت</span>
+            <span class="admin-guide-eyebrow"><?= icon('activity', 15) ?> مرکز راهنمای مدیریت</span>
             <h1>راهنمای مدیریت MirrorHub</h1>
             <p>مراحل اصلی نگهداری سامانه، مدیریت محتوا و تنظیم پایش را از این صفحه دنبال کنید. هر بخش به صفحهٔ مرتبط در پنل دسترسی مستقیم دارد.</p>
             <div class="admin-guide-meta">
-                <span><?= icon('shield-check', 15) ?> راهنمای عملیاتی مدیر</span>
-                <span><?= icon('clock', 15) ?> مطالعهٔ مرحله‌ای و سریع</span>
+                <span><?= icon('check', 15) ?> راهنمای عملیاتی مدیر</span>
+                <span><?= icon('activity', 15) ?> مطالعهٔ مرحله‌ای و سریع</span>
             </div>
         </div>
-        <div class="admin-guide-hero-mark" aria-hidden="true"><?= icon('book-open-check', 54) ?></div>
+        <div class="admin-guide-hero-mark" aria-hidden="true"><?= icon('activity', 54) ?></div>
     </section>
 
     <nav class="admin-guide-quick-nav" aria-label="دسترسی سریع به راهنما">
-        <a href="#guide-documents"><?= icon('file-text', 16) ?><span>مستندات</span></a>
+        <a href="#guide-documents"><?= icon('activity', 16) ?><span>مستندات</span></a>
         <a href="#guide-monitoring"><?= icon('activity', 16) ?><span>زمان‌بندی پایش</span></a>
-        <a href="#guide-settings"><?= icon('sliders-horizontal', 16) ?><span>تنظیمات پایش</span></a>
-        <a href="#guide-categories"><?= icon('folder-tree', 16) ?><span>دسته‌بندی و میرورها</span></a>
-        <a href="#guide-security"><?= icon('shield-check', 16) ?><span>پشتیبان و امنیت</span></a>
-        <a href="#guide-repository"><?= icon('package-check', 16) ?><span>سلامت مخزن</span></a>
+        <a href="#guide-settings"><?= icon('activity', 16) ?><span>تنظیمات پایش</span></a>
+        <a href="#guide-categories"><?= icon('folder', 16) ?><span>دسته‌بندی و میرورها</span></a>
+        <a href="#guide-security"><?= icon('check', 16) ?><span>پشتیبان و امنیت</span></a>
+        <a href="#guide-repository"><?= icon('check', 16) ?><span>سلامت مخزن</span></a>
     </nav>
 
     <div class="admin-guide-grid">
@@ -44,7 +44,7 @@ renderHeader('راهنمای مدیریت', true);
                 <li>برای نمایش وضعیت زندهٔ میرورها، در یک خط مستقل از الگوی <code>:::health ubuntu</code> استفاده کنید و نامک واقعی دسته را جایگزین کنید.</li>
             </ol>
             <p class="admin-guide-note">هر مقاله فقط به یک دسته متصل می‌شود؛ چند مقاله می‌توانند به یک دسته وصل باشند. برای راهنمای عمومی، دسته را روی «بدون اتصال به دسته» بگذارید.</p>
-            <a class="btn btn-primary" href="<?= SITE_URL ?>/admin/pages.php"><?= icon('file-text', 15) ?> مدیریت مستندات</a>
+            <a class="btn btn-primary" href="<?= SITE_URL ?>/admin/pages.php"><?= icon('activity', 15) ?> مدیریت مستندات</a>
         </article>
 
         <article class="admin-guide-card" id="guide-monitoring">
@@ -78,7 +78,7 @@ renderHeader('راهنمای مدیریت', true);
                 <div><dt>نگهداری تاریخچه</dt><dd>تعداد روزهایی که رویدادها و نتایج بررسی نگهداری می‌شوند.</dd></div>
             </dl>
             <p class="admin-guide-note">پایش HTTP/HTTPS به‌تنهایی صحت تمام بسته‌ها، تازگی همهٔ metadataها یا اعتبار امضاهای رمزنگاری‌شده را تضمین نمی‌کند.</p>
-            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/monitor.php"><?= icon('sliders-horizontal', 15) ?> باز کردن تنظیمات پایش</a>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/monitor.php"><?= icon('activity', 15) ?> باز کردن تنظیمات پایش</a>
         </article>
 
         <article class="admin-guide-card" id="guide-categories">
@@ -108,7 +108,7 @@ renderHeader('راهنمای مدیریت', true);
                 <li>کلید Cron، توکن ربات بله و مشخصات اتصال دیتابیس را در مخزن عمومی، اسکرین‌شات یا گزارش عمومی منتشر نکنید.</li>
                 <li>اگر اطلاعات محرمانه قبلاً وارد تاریخچهٔ Git شده، مقدار افشاشده را تعویض کنید؛ حذف فایل از آخرین Commit کافی نیست.</li>
             </ol>
-            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/backup.php"><?= icon('database-backup', 15) ?> مدیریت پشتیبان‌ها</a>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/backup.php"><?= icon('database', 15) ?> مدیریت پشتیبان‌ها</a>
         </article>
 
         <article class="admin-guide-card" id="guide-repository">

@@ -102,17 +102,17 @@ function renderHeader($title = '', $isAdmin = false) {
             </a>
 
             <div class="admin-sidebar-context">
-                <span class="admin-sidebar-context-icon"><?= icon('layout-dashboard', 17) ?></span>
+                <span class="admin-sidebar-context-icon"><?= icon('dashboard', 17) ?></span>
                 <span><small>محیط کاری</small><strong>مدیریت سامانه</strong></span>
             </div>
 
             <nav id="main-navigation" class="admin-nav" aria-label="منوی اصلی مدیریت">
                 <span class="admin-nav-heading">نمای کلی</span>
                 <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" <?= $currentPage === 'dashboard.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('layout-dashboard', 18) ?><span>داشبورد</span>
+                    <?= icon('dashboard', 18) ?><span>داشبورد</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>" <?= $currentPage === 'help.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('book-open', 18) ?><span>راهنمای مدیریت</span>
+                    <?= icon('activity', 18) ?><span>راهنمای مدیریت</span>
                 </a>
 
                 <span class="admin-nav-heading">مدیریت محتوا</span>
@@ -120,10 +120,10 @@ function renderHeader($title = '', $isAdmin = false) {
                     <?= icon('server', 18) ?><span>میرورها</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" <?= $currentPage === 'categories.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('folder-tree', 18) ?><span>دسته‌بندی‌ها</span>
+                    <?= icon('folder', 18) ?><span>دسته‌بندی‌ها</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>" <?= $currentPage === 'pages.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('file-text', 18) ?><span>مستندات</span>
+                    <?= icon('activity', 18) ?><span>مستندات</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>" <?= $currentPage === 'requests.php' ? 'aria-current="page"' : '' ?>>
                     <?= icon('inbox', 18) ?><span>درخواست‌ها</span>
@@ -134,7 +134,7 @@ function renderHeader($title = '', $isAdmin = false) {
                     <?= icon('activity', 18) ?><span>پایش میرورها</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/backup.php" class="<?= $currentPage === 'backup.php' ? 'active' : '' ?>" <?= $currentPage === 'backup.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('database-backup', 18) ?><span>پشتیبان‌گیری</span>
+                    <?= icon('database', 18) ?><span>پشتیبان‌گیری</span>
                 </a>
                 <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>" <?= $currentPage === 'users.php' ? 'aria-current="page"' : '' ?>>
                     <?= icon('users', 18) ?><span>کاربران</span>
@@ -143,7 +143,7 @@ function renderHeader($title = '', $isAdmin = false) {
 
             <div class="admin-sidebar-footer">
                 <div class="admin-user-chip">
-                    <span class="admin-user-avatar"><?= icon('user-round', 18) ?></span>
+                    <span class="admin-user-avatar"><?= icon('users', 18) ?></span>
                     <span class="admin-user-meta"><strong><?= htmlspecialchars((string)($_SESSION['username'] ?? 'مدیر')) ?></strong><small>حساب مدیر</small></span>
                 </div>
                 <a href="<?= SITE_URL ?>/admin/login.php?action=logout" class="admin-logout-link">
@@ -164,8 +164,8 @@ function renderHeader($title = '', $isAdmin = false) {
                     </div>
                 </div>
                 <div class="admin-topbar-actions">
-                    <span class="admin-topbar-user"><?= icon('user-round', 16) ?><?= htmlspecialchars((string)($_SESSION['username'] ?? 'مدیر')) ?></span>
-                    <a href="<?= SITE_URL ?>/" class="admin-view-site" target="_blank" rel="noopener noreferrer"><?= icon('external-link', 15) ?><span>مشاهدهٔ سایت</span></a>
+                    <span class="admin-topbar-user"><?= icon('users', 16) ?><?= htmlspecialchars((string)($_SESSION['username'] ?? 'مدیر')) ?></span>
+                    <a href="<?= SITE_URL ?>/" class="admin-view-site" target="_blank" rel="noopener noreferrer"><?= icon('activity', 15) ?><span>مشاهدهٔ سایت</span></a>
                 </div>
             </header>
             <main id="main-content" class="container main-content admin-content" tabindex="-1">
@@ -197,7 +197,7 @@ function renderHeader($title = '', $isAdmin = false) {
                     <?= icon('search', 15) ?><span>جستجو</span>
                 </a>
                 <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('book-open', 15) ?><span>مستندات</span>
+                    <?= icon('activity', 15) ?><span>مستندات</span>
                 </a>
                 <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>>
                     <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
