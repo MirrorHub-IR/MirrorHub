@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.addEventListener('click', event => {
             if (!adminMode && header.classList.contains('nav-open') && !header.contains(event.target)) closeMenu();
-            if (adminMode && adminShell && adminShell.classList.contains('sidebar-open') && !adminShell.contains(event.target)) closeMenu();
+            if (adminMode && adminShell && adminShell.classList.contains('sidebar-open') && (event.target === adminShell || !adminShell.contains(event.target))) closeMenu();
         });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') closeMenu();
