@@ -31,6 +31,8 @@ function renderHeader($title = '', $isAdmin = false) {
     $extraStyles = is_array($seo['styles'] ?? null) ? $seo['styles'] : [];
     if (!$extraStyles && $currentPage === 'docs.php') $extraStyles = ['css/cms.css'];
     if (!$extraStyles && $isAdmin && $currentPage === 'pages.php') $extraStyles = ['css/cms.css'];
+    if ($isAdmin) $extraStyles[] = 'css/admin.css';
+    $extraStyles = array_values(array_unique($extraStyles));
     $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
     $structuredData = [[
         '@context' => 'https://schema.org',
@@ -59,12 +61,15 @@ function renderHeader($title = '', $isAdmin = false) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <link rel="preload" href="<?= asset('fonts/Vazirmatn-Variable.woff2') ?>" as="font" type="font/woff2" crossorigin>
     <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
     <meta name="robots" content="<?= htmlspecialchars($robotsContent, ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <meta name="theme-color" content="#0e1410">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <link rel="stylesheet" href="<?= asset('css/style.css') ?>">
+    <link rel="stylesheet" href="<?= asset('css/fonts.css') ?>">
     <?php foreach ($extraStyles as $stylePath): ?>
         <link rel="stylesheet" href="<?= htmlspecialchars(asset((string)$stylePath), ENT_QUOTES, 'UTF-8') ?>">
     <?php endforeach; ?>
@@ -88,73 +93,123 @@ function renderHeader($title = '', $isAdmin = false) {
 </head>
 <body class="<?= $isAdmin ? 'admin-layout' : 'public-layout' ?>">
     <a class="skip-link" href="#main-content">رفتن به محتوای اصلی</a>
-    <header class="main-header">
+<?php if ($isAdmin && $currentPage !== 'login.php'): ?>
+    <div class="admin-app">
+        <aside class="admin-sidebar" aria-label="ناوبری مدیریت">
+            <a href="<?= SITE_URL ?>/admin/dashboard.php" class="admin-sidebar-brand">
+                <img src="<?= asset('logo.png') ?>" alt="" width="42" height="42">
+                <span><strong><?= htmlspecialchars($siteName) ?></strong><small>کنسول مدیریت</small></span>
+            </a>
+
+            <div class="admin-sidebar-context">
+                <span class="admin-sidebar-context-icon"><?= icon('layout-dashboard', 17) ?></span>
+                <span><small>محیط کاری</small><strong>مدیریت سامانه</strong></span>
+            </div>
+
+            <nav id="main-navigation" class="admin-nav" aria-label="منوی اصلی مدیریت">
+                <span class="admin-nav-heading">نمای کلی</span>
+                <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" <?= $currentPage === 'dashboard.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('layout-dashboard', 18) ?><span>داشبورد</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>" <?= $currentPage === 'help.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('book-open', 18) ?><span>راهنمای مدیریت</span>
+                </a>
+
+                <span class="admin-nav-heading">مدیریت محتوا</span>
+                <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>" <?= $currentPage === 'mirrors.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('server', 18) ?><span>میرورها</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" <?= $currentPage === 'categories.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('folder-tree', 18) ?><span>دسته‌بندی‌ها</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>" <?= $currentPage === 'pages.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('file-text', 18) ?><span>مستندات</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>" <?= $currentPage === 'requests.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('inbox', 18) ?><span>درخواست‌ها</span>
+                </a>
+
+                <span class="admin-nav-heading">پایش و زیرساخت</span>
+                <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>" <?= $currentPage === 'monitor.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('activity', 18) ?><span>پایش میرورها</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/backup.php" class="<?= $currentPage === 'backup.php' ? 'active' : '' ?>" <?= $currentPage === 'backup.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('database-backup', 18) ?><span>پشتیبان‌گیری</span>
+                </a>
+                <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>" <?= $currentPage === 'users.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('users', 18) ?><span>کاربران</span>
+                </a>
+            </nav>
+
+            <div class="admin-sidebar-footer">
+                <div class="admin-user-chip">
+                    <span class="admin-user-avatar"><?= icon('user-round', 18) ?></span>
+                    <span class="admin-user-meta"><strong><?= htmlspecialchars((string)($_SESSION['username'] ?? 'مدیر')) ?></strong><small>حساب مدیر</small></span>
+                </div>
+                <a href="<?= SITE_URL ?>/admin/login.php?action=logout" class="admin-logout-link">
+                    <?= icon('log-out', 17) ?><span>خروج امن</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="admin-workspace">
+            <header class="main-header admin-topbar">
+                <div class="admin-topbar-leading">
+                    <button type="button" class="nav-toggle" aria-label="باز کردن منوی مدیریت" aria-expanded="false" aria-controls="main-navigation">
+                        <span></span><span></span><span></span>
+                    </button>
+                    <div class="admin-topbar-title">
+                        <span>پنل مدیریت MirrorHub</span>
+                        <strong><?= htmlspecialchars($title !== '' ? $title : 'مدیریت سامانه') ?></strong>
+                    </div>
+                </div>
+                <div class="admin-topbar-actions">
+                    <span class="admin-topbar-user"><?= icon('user-round', 16) ?><?= htmlspecialchars((string)($_SESSION['username'] ?? 'مدیر')) ?></span>
+                    <a href="<?= SITE_URL ?>/" class="admin-view-site" target="_blank" rel="noopener noreferrer"><?= icon('external-link', 15) ?><span>مشاهدهٔ سایت</span></a>
+                </div>
+            </header>
+            <main id="main-content" class="container main-content admin-content" tabindex="-1">
+<?php elseif ($isAdmin): ?>
+    <header class="main-header admin-login-header">
         <div class="container">
-            <a href="<?= SITE_URL ?>/<?= $isAdmin ? 'admin/dashboard.php' : 'index.php' ?>" class="logo">
+            <a href="<?= SITE_URL ?>/" class="logo">
                 <img src="<?= asset('logo.png') ?>" alt="<?= htmlspecialchars($siteName) ?>" class="logo-mark" width="34" height="34">
                 <span class="logo-text"><?= htmlspecialchars($siteName) ?></span>
             </a>
-            <button type="button"
-                    class="nav-toggle"
-                    aria-label="باز کردن منو"
-                    aria-expanded="false"
-                    aria-controls="main-navigation">
+        </div>
+    </header>
+    <main id="main-content" class="container main-content" tabindex="-1">
+<?php else: ?>
+    <header class="main-header">
+        <div class="container">
+            <a href="<?= SITE_URL ?>/index.php" class="logo">
+                <img src="<?= asset('logo.png') ?>" alt="<?= htmlspecialchars($siteName) ?>" class="logo-mark" width="34" height="34">
+                <span class="logo-text"><?= htmlspecialchars($siteName) ?></span>
+            </a>
+            <button type="button" class="nav-toggle" aria-label="باز کردن منو" aria-expanded="false" aria-controls="main-navigation">
                 <span></span><span></span><span></span>
             </button>
-            <nav id="main-navigation" class="main-nav" aria-label="<?= $isAdmin ? 'ناوبری مدیریت' : 'ناوبری اصلی' ?>">
-                <?php if ($isAdmin): ?>
-                    <a href="<?= SITE_URL ?>/admin/dashboard.php" class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" <?= $currentPage === 'dashboard.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('dashboard', 15) ?><span>داشبورد</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/help.php" class="<?= $currentPage === 'help.php' ? 'active' : '' ?>" <?= $currentPage === 'help.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('book-open', 15) ?><span>راهنمای مدیریت</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/categories.php" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" <?= $currentPage === 'categories.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('folder', 15) ?><span>دسته‌بندی‌ها</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/mirrors.php" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>" <?= $currentPage === 'mirrors.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('server', 15) ?><span>میرورها</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/pages.php" class="<?= $currentPage === 'pages.php' ? 'active' : '' ?>" <?= $currentPage === 'pages.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('activity', 15) ?><span>مستندات</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/monitor.php" class="<?= $currentPage === 'monitor.php' ? 'active' : '' ?>" <?= $currentPage === 'monitor.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('activity', 15) ?><span>پایش سرورها</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/requests.php" class="<?= $currentPage === 'requests.php' ? 'active' : '' ?>" <?= $currentPage === 'requests.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('inbox', 15) ?><span>درخواست‌ها</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/backup.php" class="<?= $currentPage === 'backup.php' ? 'active' : '' ?>" <?= $currentPage === 'backup.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('database', 15) ?><span>پشتیبان</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>" <?= $currentPage === 'users.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('users', 15) ?><span>کاربران</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/admin/login.php?action=logout" class="btn-logout" title="خروج از حساب">
-                        <?= icon('log-out', 14) ?><span>خروج</span>
-                    </a>
-                <?php else: ?>
-                    <a href="<?= SITE_URL ?>/index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>" <?= $currentPage === 'index.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('home', 15) ?><span>خانه</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>" <?= $currentPage === 'search.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('search', 15) ?><span>جستجو</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('activity', 15) ?><span>مستندات</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
-                    </a>
-                    <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>" <?= $currentPage === 'suggest.php' ? 'aria-current="page"' : '' ?>>
-                        <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
-                    </a>
-                <?php endif; ?>
+            <nav id="main-navigation" class="main-nav" aria-label="ناوبری اصلی">
+                <a href="<?= SITE_URL ?>/index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>" <?= $currentPage === 'index.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('home', 15) ?><span>خانه</span>
+                </a>
+                <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>" <?= $currentPage === 'search.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('search', 15) ?><span>جستجو</span>
+                </a>
+                <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('book-open', 15) ?><span>مستندات</span>
+                </a>
+                <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
+                </a>
+                <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>" <?= $currentPage === 'suggest.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
+                </a>
             </nav>
         </div>
     </header>
-
     <main id="main-content" class="container main-content" tabindex="-1">
+<?php endif; ?>
         <?php if ($flashSuccess): ?>
             <div class="alert alert-success"><?= htmlspecialchars($flashSuccess) ?></div>
         <?php endif; ?>
@@ -165,9 +220,19 @@ function renderHeader($title = '', $isAdmin = false) {
 }
 
 function renderFooter() {
+    $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    $adminRoute = strpos((string)($_SERVER['SCRIPT_NAME'] ?? ''), '/admin/') !== false;
+    $adminShell = $adminRoute && $scriptName !== 'login.php';
 ?>
     </main>
-
+    <?php if ($adminShell): ?>
+    <footer class="admin-footer">
+        <span><?= htmlspecialchars(SITE_NAME) ?> <span aria-hidden="true">·</span> پنل مدیریت</span>
+        <span>مدیریت امن و یکپارچهٔ میرورها</span>
+    </footer>
+        </div>
+    </div>
+    <?php else: ?>
     <footer class="main-footer">
         <div class="container">
             <div class="footer-brand">
@@ -181,10 +246,9 @@ function renderFooter() {
             <p class="footer-made">ساخته شده با <span class="heart"><?= icon('heart', 14) ?></span> در ایران</p>
         </div>
     </footer>
+    <?php endif; ?>
 
     <?php
-        $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
-        $adminRoute = strpos((string)($_SERVER['SCRIPT_NAME'] ?? ''), '/admin/') !== false;
         $adminInteractionPages = ['categories.php', 'mirrors.php', 'pages.php', 'monitor.php', 'requests.php', 'backup.php', 'users.php'];
         $needsAdminInteractions = $adminRoute && in_array($scriptName, $adminInteractionPages, true);
         $needsPing = !$adminRoute && in_array($scriptName, ['index.php', 'search.php', 'category.php'], true);

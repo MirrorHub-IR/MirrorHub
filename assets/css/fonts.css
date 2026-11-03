@@ -1,0 +1,37 @@
+/* Self-hosted Vazirmatn variable font — SIL Open Font License 1.1. */
+@font-face {
+    font-family: "Vazirmatn";
+    src: url("../fonts/Vazirmatn-Variable.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+:root {
+    font-family: "Vazirmatn", Tahoma, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+    font-family: "Vazirmatn", Tahoma, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+    font-size: inherit;
+}
+
+code,
+pre,
+.ltr-text,
+[dir="ltr"] {
+    font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}

@@ -130,7 +130,9 @@ $scheme = parse_url(SITE_URL, PHP_URL_SCHEME) ?: 'https';
 renderHeader('پایش سرورها', true);
 ?>
 
-<section class="section">
+<div class="admin-monitor-page">
+
+<section class="section admin-monitor-hero">
     <div class="section-header">
         <h1 class="section-title">پایش سرورها</h1>
         <div class="editor-actions">
@@ -190,7 +192,7 @@ renderHeader('پایش سرورها', true);
     </div>
 </section>
 
-<section class="section">
+<section class="section admin-monitor-table-section">
     <h2 class="section-title">وضعیت میرورها</h2>
     <?php if (empty($rows)): ?>
         <p class="empty-state">میروری برای پایش وجود ندارد.</p>
@@ -263,7 +265,7 @@ renderHeader('پایش سرورها', true);
     <?php endif; ?>
 </section>
 
-<section class="section">
+<section class="section admin-monitor-schedule-section">
     <h2 class="section-title">زمان‌بندی اجرای خودکار</h2>
     <div class="mon-info-box">
         <p>
@@ -292,7 +294,7 @@ renderHeader('پایش سرورها', true);
     </div>
 </section>
 
-<section class="section">
+<section class="section admin-monitor-settings-section">
     <h2 class="section-title">تنظیمات پالایش و پایش</h2>
     <div class="mon-info-box">
         <h3>راهنمای سریع</h3>
@@ -493,5 +495,7 @@ renderHeader('پایش سرورها', true);
         </div>
     <?php endif; ?>
 </section>
+
+</div>
 
 <?php renderFooter(); ?>
