@@ -1,32 +1,38 @@
 /* Small public-site interactions. No libraries, CDN requests, or framework dependency. */
 document.addEventListener('DOMContentLoaded', () => {
+    const adminMode = document.body.classList.contains('admin-layout');
+    const adminShell = adminMode ? document.querySelector('.admin-app') : null;
     const header = document.querySelector('.main-header');
     const toggle = document.querySelector('.nav-toggle');
     const nav = document.getElementById('main-navigation');
 
     if (header && toggle && nav) {
         const closeMenu = () => {
-            header.classList.remove('nav-open');
+            if (adminMode && adminShell) adminShell.classList.remove('sidebar-open');
+            else header.classList.remove('nav-open');
             toggle.setAttribute('aria-expanded', 'false');
-            toggle.setAttribute('aria-label', 'باز کردن منو');
+            toggle.setAttribute('aria-label', adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منو');
         };
         toggle.addEventListener('click', () => {
-            const open = header.classList.toggle('nav-open');
+            const open = adminMode && adminShell
+                ? adminShell.classList.toggle('sidebar-open')
+                : header.classList.toggle('nav-open');
             toggle.setAttribute('aria-expanded', String(open));
-            toggle.setAttribute('aria-label', open ? 'بستن منو' : 'باز کردن منو');
+            toggle.setAttribute('aria-label', open ? 'بستن منو' : (adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منو'));
         });
         nav.addEventListener('click', event => {
             if (event.target.closest('a')) closeMenu();
         });
         document.addEventListener('click', event => {
-            if (header.classList.contains('nav-open') && !header.contains(event.target)) closeMenu();
+            if (!adminMode && header.classList.contains('nav-open') && !header.contains(event.target)) closeMenu();
+            if (adminMode && adminShell && adminShell.classList.contains('sidebar-open') && (event.target === adminShell || !adminShell.contains(event.target))) closeMenu();
         });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') closeMenu();
         });
         window.addEventListener('resize', () => {
-            const adminBreakpoint = document.body.classList.contains('admin-layout') ? 1160 : 900;
-            if (window.innerWidth > adminBreakpoint) closeMenu();
+            const breakpoint = adminMode ? 900 : 900;
+            if (window.innerWidth > breakpoint) closeMenu();
         }, { passive: true });
     }
 

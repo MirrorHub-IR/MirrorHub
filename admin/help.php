@@ -7,64 +7,121 @@ requireAdmin();
 renderHeader('راهنمای مدیریت', true);
 ?>
 
-<section class="section">
-    <div class="section-header">
-        <h1 class="section-title">راهنمای مدیریت MirrorHub</h1>
-        <a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/dashboard.php">بازگشت به داشبورد</a>
-    </div>
-    <p class="category-desc">راهنمای سریع برای افزودن میرور، نوشتن مستندات، تنظیم چرخهٔ پایش و پشتیبان‌گیری.</p>
-</section>
+<div class="admin-guide-page">
+    <section class="admin-guide-hero">
+        <div class="admin-guide-hero-copy">
+            <span class="admin-guide-eyebrow"><?= icon('activity', 15) ?> مرکز راهنمای مدیریت</span>
+            <h1>راهنمای مدیریت MirrorHub</h1>
+            <p>مراحل اصلی نگهداری سامانه، مدیریت محتوا و تنظیم پایش را از این صفحه دنبال کنید. هر بخش به صفحهٔ مرتبط در پنل دسترسی مستقیم دارد.</p>
+            <div class="admin-guide-meta">
+                <span><?= icon('check', 15) ?> راهنمای عملیاتی مدیر</span>
+                <span><?= icon('activity', 15) ?> مطالعهٔ مرحله‌ای و سریع</span>
+            </div>
+        </div>
+        <div class="admin-guide-hero-mark" aria-hidden="true"><?= icon('activity', 54) ?></div>
+    </section>
 
-<section class="section">
-    <div class="card" style="padding: 1.25rem; margin-bottom: 1rem;">
-        <h2 class="section-title">۱. راهنمای نصب یا تغییر میرور برای Ubuntu و بقیهٔ توزیع‌ها</h2>
-        <ol>
-            <li>از منوی مدیریت وارد «مستندات» شو و «مقاله جدید» را بزن.</li>
-            <li>عنوان روشن بنویس؛ مثلاً «تغییر میرورهای Ubuntu به مخازن MirrorHub».</li>
-            <li>در گزینهٔ «راهنمای مربوط به کدام دسته است؟» دستهٔ دقیق نرم‌افزار را انتخاب کن. مثلاً Ubuntu؛ این همان پیوندی است که راهنما را به صفحهٔ دسته وصل می‌کند.</li>
-            <li>متن را با Markdown بنویس، نامک و خلاصه را بررسی کن و وضعیت را روی «منتشرشده» بگذار.</li>
-            <li>پس از انتشار، لینک مقاله در صفحهٔ همان دسته نمایش داده می‌شود. برای نمایش وضعیت زندهٔ میرورها می‌توانی در یک خط جدا از الگوی <code>:::health ubuntu</code> استفاده کنی؛ به‌جای <code>ubuntu</code> نامک واقعی دسته را بگذار.</li>
-        </ol>
-        <p class="form-hint">هر مقاله به یک دسته وصل می‌شود؛ چند مقاله می‌توانند به یک دسته وصل باشند. برای راهنمای عمومی که به دسته‌ای مربوط نیست، «بدون اتصال به دسته» را انتخاب کن.</p>
-        <p><a class="btn btn-sm btn-primary" href="<?= SITE_URL ?>/admin/pages.php">رفتن به مدیریت مستندات</a></p>
-    </div>
+    <nav class="admin-guide-quick-nav" aria-label="دسترسی سریع به راهنما">
+        <a href="#guide-documents"><?= icon('activity', 16) ?><span>مستندات</span></a>
+        <a href="#guide-monitoring"><?= icon('activity', 16) ?><span>زمان‌بندی پایش</span></a>
+        <a href="#guide-settings"><?= icon('activity', 16) ?><span>تنظیمات پایش</span></a>
+        <a href="#guide-categories"><?= icon('folder', 16) ?><span>دسته‌بندی و میرورها</span></a>
+        <a href="#guide-security"><?= icon('check', 16) ?><span>پشتیبان و امنیت</span></a>
+        <a href="#guide-repository"><?= icon('check', 16) ?><span>سلامت مخزن</span></a>
+    </nav>
 
-    <div class="card" style="padding: 1.25rem; margin-bottom: 1rem;">
-        <h2 class="section-title">۲. تنظیم زمان‌بندی Cron و نمایش آن برای کاربران</h2>
-        <ol>
-            <li>به «پایش سرورها» برو و در «فاصلهٔ اجرای واقعی پایش» بازه را انتخاب کن؛ برای نمونه هر ۱ ساعت، هر ۱۲ ساعت، روزی یک‌بار، هر ۲ روز، هر ۳ روز یا هفته‌ای یک‌بار.</li>
-            <li>روی «ذخیرهٔ تنظیمات» بزن. دستور پیشنهادی Cron در بالای صفحه بر اساس همین بازه ساخته می‌شود.</li>
-            <li>دستور نمایش‌داده‌شده را در بخش Cron هاست (مثل cPanel) قرار بده. اگر بازه را عوض کردی، دستور قبلی را با دستور جدید جایگزین کن.</li>
-            <li>صفحهٔ عمومی «وضعیت سرورها» همین بازهٔ تنظیم‌شده را نشان می‌دهد. اگر Cron بیش از حد زود اجرا شود، برنامه از اجرای چرخهٔ پایش قبل از رسیدن موعد بعدی جلوگیری می‌کند.</li>
-        </ol>
-        <p class="form-hint">برای بازه‌های ۲۴ ساعت و بیشتر، زمان‌بند روزانه برنامه را صدا می‌زند و خود برنامه فاصلهٔ واقعی چرخه را رعایت می‌کند. لینک «تست این آدرس» یک اجرای دستی انجام می‌دهد؛ برای Cron واقعی، از همان تنظیم زمان‌بندی در هاست استفاده کن.</p>
-        <p><a class="btn btn-sm btn-primary" href="<?= SITE_URL ?>/admin/monitor.php">رفتن به تنظیمات پایش</a> <a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/status.php" target="_blank" rel="noopener">دیدن صفحهٔ عمومی وضعیت</a></p>
-    </div>
+    <div class="admin-guide-grid">
+        <article class="admin-guide-card" id="guide-documents">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۱</span>
+                <div><span class="admin-guide-kicker">محتوا و مستندات</span><h2>نوشتن راهنمای نصب یا تغییر میرور</h2></div>
+            </div>
+            <ol class="admin-guide-steps">
+                <li>از منوی مدیریت وارد «مستندات» شوید و «مقاله جدید» را انتخاب کنید.</li>
+                <li>عنوان روشن، نامک یکتا و خلاصه‌ای کوتاه بنویسید.</li>
+                <li>دستهٔ نرم‌افزار مرتبط را در فیلد «راهنمای مربوط به کدام دسته است؟» انتخاب کنید؛ برای نمونه Ubuntu.</li>
+                <li>متن را با Markdown بنویسید، پیش‌نمایش را بررسی کنید و پس از اطمینان، وضعیت را روی «منتشرشده» قرار دهید.</li>
+                <li>برای نمایش وضعیت زندهٔ میرورها، در یک خط مستقل از الگوی <code>:::health ubuntu</code> استفاده کنید و نامک واقعی دسته را جایگزین کنید.</li>
+            </ol>
+            <p class="admin-guide-note">هر مقاله فقط به یک دسته متصل می‌شود؛ چند مقاله می‌توانند به یک دسته وصل باشند. برای راهنمای عمومی، دسته را روی «بدون اتصال به دسته» بگذارید.</p>
+            <a class="btn btn-primary" href="<?= SITE_URL ?>/admin/pages.php"><?= icon('activity', 15) ?> مدیریت مستندات</a>
+        </article>
 
-    <div class="card" style="padding: 1.25rem; margin-bottom: 1rem;">
-        <h2 class="section-title">۳. معنی گزینه‌های پایش</h2>
-        <ul>
-            <li><strong>مهلت پاسخ:</strong> چند ثانیه برای پاسخ هر لینک صبر شود. اگر پاسخ نرسد، یک بار دیگر امتحان می‌شود.</li>
-            <li><strong>آستانهٔ کندی:</strong> اگر پاسخ از این مقدار بیشتر طول بکشد، وضعیت «کند» می‌شود؛ «کند» با «قطع» یکی نیست.</li>
-            <li><strong>حداکثر میرور در هر چرخه:</strong> تعداد بررسی‌ها را محدود می‌کند تا چرخه بیش از حد طولانی نشود. میرورهای قدیمی‌تر در اجراهای بعدی نوبت می‌گیرند.</li>
-            <li><strong>خطاهای متوالی:</strong> کمک می‌کند یک مشکل لحظه‌ای به‌اشتباه قطعی دائمی حساب نشود. مقدار پیش‌فرض ۲ معمولاً انتخاب محافظه‌کارانه‌ای است.</li>
-            <li><strong>تنظیمات پیشرفته:</strong> نگهداری تاریخچه، هشدار بله و وب‌هوک دلخواه را شامل می‌شود.</li>
-        </ul>
-        <p class="form-hint">سامانه فعلاً دسترسی HTTP/HTTPS را بررسی می‌کند. این بررسی به‌تنهایی معتبر بودن امضای بسته‌ها یا سلامت محتوای کامل مخزن را ثابت نمی‌کند.</p>
-    </div>
+        <article class="admin-guide-card" id="guide-monitoring">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۲</span>
+                <div><span class="admin-guide-kicker">زمان‌بندی و اجرا</span><h2>تنظیم Cron و اجرای خودکار</h2></div>
+            </div>
+            <ol class="admin-guide-steps">
+                <li>در صفحهٔ «پایش میرورها»، مقدار «فاصلهٔ اجرای واقعی پایش» را انتخاب کنید.</li>
+                <li>تنظیمات را ذخیره کنید تا دستور Cron بر اساس بازهٔ جدید ساخته شود.</li>
+                <li>دستور پیشنهادی را در cPanel یا زمان‌بند سرور ثبت کنید. در صورت تغییر فاصله، دستور قبلی را جایگزین کنید.</li>
+                <li>صفحهٔ عمومی وضعیت، بازهٔ انتخاب‌شده را نمایش می‌دهد. فراخوانی زودتر از موعد باعث اجرای چرخهٔ جدید نمی‌شود.</li>
+            </ol>
+            <p class="admin-guide-note">برای بازه‌های ۲۴ ساعت و بیشتر، زمان‌بند روزانه برنامه را فراخوانی می‌کند و خود MirrorHub فاصلهٔ واقعی چرخه را کنترل می‌کند. اجرای دستی برای آزمایش است، نه جایگزین Cron.</p>
+            <div class="admin-guide-actions">
+                <a class="btn btn-primary" href="<?= SITE_URL ?>/admin/monitor.php"><?= icon('activity', 15) ?> تنظیمات پایش</a>
+                <a class="btn btn-outline" href="<?= SITE_URL ?>/status.php" target="_blank" rel="noopener noreferrer">صفحهٔ عمومی وضعیت</a>
+            </div>
+        </article>
 
-    <div class="card" style="padding: 1.25rem; margin-bottom: 1rem;">
-        <h2 class="section-title">۴. دستهٔ نرم‌افزار یا ارائه‌دهنده؟</h2>
-        <p>دستهٔ «نرم‌افزار» برای صفحات کاربر و راهنمای نصب/تغییر مخازن است؛ دستهٔ «ارائه‌دهنده» مشخص می‌کند کدام سرور در چرخهٔ پایش سلامت بررسی شود. برای اینکه یک میرور پایش شود، باید فعال باشد و به دست‌کم یک دستهٔ ارائه‌دهنده متصل شده باشد.</p>
-        <p><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/categories.php">مدیریت دسته‌بندی‌ها</a> <a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/mirrors.php">مدیریت میرورها</a></p>
-    </div>
+        <article class="admin-guide-card" id="guide-settings">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۳</span>
+                <div><span class="admin-guide-kicker">پیکربندی پایش</span><h2>معنی پارامترهای اصلی</h2></div>
+            </div>
+            <dl class="admin-guide-definitions">
+                <div><dt>مهلت پاسخ</dt><dd>مدت انتظار برای پاسخ HTTP/HTTPS؛ در صورت خطا، درخواست یک بار دیگر امتحان می‌شود.</dd></div>
+                <div><dt>آستانهٔ کندی</dt><dd>زمانی که عبور از آن وضعیت را «کند» می‌کند؛ کند بودن به معنی قطع بودن نیست.</dd></div>
+                <div><dt>حداکثر میرور در هر چرخه</dt><dd>سقف بررسی در هر اجرا؛ میرورهای قدیمی‌تر در چرخه‌های بعدی اولویت می‌گیرند.</dd></div>
+                <div><dt>خطاهای متوالی</dt><dd>برای جلوگیری از تشخیص قطعی کاذب؛ مقدار ۲ نقطهٔ شروع محافظه‌کارانه‌ای است.</dd></div>
+                <div><dt>نگهداری تاریخچه</dt><dd>تعداد روزهایی که رویدادها و نتایج بررسی نگهداری می‌شوند.</dd></div>
+            </dl>
+            <p class="admin-guide-note">پایش HTTP/HTTPS به‌تنهایی صحت تمام بسته‌ها، تازگی همهٔ metadataها یا اعتبار امضاهای رمزنگاری‌شده را تضمین نمی‌کند.</p>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/monitor.php"><?= icon('activity', 15) ?> باز کردن تنظیمات پایش</a>
+        </article>
 
-    <div class="card" style="padding: 1.25rem;">
-        <h2 class="section-title">۵. پشتیبان‌گیری و امنیت</h2>
-        <p>قبل از تغییر عمده یا وارد کردن فایل پشتیبان، یک بکاپ تازه بگیر. مقاله‌های CMS در همان پایگاه داده ذخیره می‌شوند و همراه پشتیبان کامل دیتابیس قرار می‌گیرند.</p>
-        <p>کلید Cron، توکن ربات بله و اطلاعات اتصال دیتابیس را در چت، اسکرین‌شات عمومی یا مخزن کد منتشر نکن. اگر اطلاعات محرمانه‌ای قبلاً وارد تاریخچهٔ Git شده، فقط حذف فایل کافی نیست؛ مقدار مربوطه را هم عوض کن.</p>
-        <p><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/backup.php">رفتن به پشتیبان‌گیری</a></p>
+        <article class="admin-guide-card" id="guide-categories">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۴</span>
+                <div><span class="admin-guide-kicker">ساختار داده‌ها</span><h2>تفاوت دستهٔ نرم‌افزار و ارائه‌دهنده</h2></div>
+            </div>
+            <div class="admin-guide-compare">
+                <div><strong>دستهٔ نرم‌افزار</strong><p>برای صفحه‌های کاربر و راهنماهای نصب یا تغییر مخزن استفاده می‌شود.</p></div>
+                <div><strong>دستهٔ ارائه‌دهنده</strong><p>تعیین می‌کند کدام سرورها در چرخهٔ پایش قرار بگیرند.</p></div>
+            </div>
+            <p class="admin-guide-note">یک میرور برای ورود به چرخهٔ پایش باید فعال باشد و حداقل به یک دستهٔ ارائه‌دهنده متصل شده باشد.</p>
+            <div class="admin-guide-actions">
+                <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/categories.php">دسته‌بندی‌ها</a>
+                <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/mirrors.php">میرورها</a>
+            </div>
+        </article>
+
+        <article class="admin-guide-card" id="guide-security">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۵</span>
+                <div><span class="admin-guide-kicker">امنیت و بازیابی</span><h2>پشتیبان‌گیری و اطلاعات محرمانه</h2></div>
+            </div>
+            <ol class="admin-guide-steps">
+                <li>پیش از تغییرات عمده یا بازیابی اطلاعات، یک نسخهٔ پشتیبان تازه تهیه کنید.</li>
+                <li>مقاله‌های CMS همراه پشتیبان کامل پایگاه داده نگهداری می‌شوند.</li>
+                <li>کلید Cron، توکن ربات بله و مشخصات اتصال دیتابیس را در مخزن عمومی، اسکرین‌شات یا گزارش عمومی منتشر نکنید.</li>
+                <li>اگر اطلاعات محرمانه قبلاً وارد تاریخچهٔ Git شده، مقدار افشاشده را تعویض کنید؛ حذف فایل از آخرین Commit کافی نیست.</li>
+            </ol>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/backup.php"><?= icon('database', 15) ?> مدیریت پشتیبان‌ها</a>
+        </article>
+
+        <article class="admin-guide-card" id="guide-repository">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۶</span>
+                <div><span class="admin-guide-kicker">سلامت محتوا</span><h2>بررسی سلامت و قالب مخزن</h2></div>
+            </div>
+            <p>در صفحهٔ جزئیات هر میرور، وضعیت HTTP، تاریخچهٔ پاسخ و نتیجهٔ بررسی متادیتا جداگانه نمایش داده می‌شود. قابل‌دسترس بودن URL معادل سالم بودن محتوای مخزن نیست.</p>
+            <p>برای قالب APT، APK، Pacman یا RPM، نسخهٔ توزیع و معماری هدف را با ارائه‌دهنده تطبیق دهید. جای‌نگهدارهایی مانند <code>&lt;CODENAME&gt;</code> یا <code>&lt;ALPINE_VERSION&gt;</code> باید با مقدار واقعی جایگزین شوند.</p>
+            <p class="admin-guide-note">مقدار «تنظیم نشده» در سلامت متادیتا یعنی هنوز پروفایل محتوا برای آن میرور پیکربندی نشده است، نه اینکه مخزن خراب باشد.</p>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/mirrors.php"><?= icon('server', 15) ?> مشاهدهٔ میرورها</a>
+        </article>
     </div>
-</section>
+</div>
 
 <?php renderFooter(); ?>
