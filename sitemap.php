@@ -4,6 +4,8 @@ header('Content-Type: application/xml; charset=UTF-8');
 header('X-Content-Type-Options: nosniff');
 
 $baseUrl = rtrim(SITE_URL, '/');
+$latestGuideUpdate = $pdo->query("SELECT MAX(updated_at) FROM cms_articles WHERE status = 'published'")->fetchColumn();
+$latestGuideTimestamp = $latestGuideUpdate ? strtotime((string)$latestGuideUpdate) : false;
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 ?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -12,6 +14,7 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
   </url>
   <url>
     <loc><?= htmlspecialchars($baseUrl . '/guides/', ENT_XML1, 'UTF-8') ?></loc>
+    <?php if ($latestGuideTimestamp !== false): ?><lastmod><?= gmdate('Y-m-d', $latestGuideTimestamp) ?></lastmod><?php endif; ?>
   </url>
   <url>
     <loc><?= htmlspecialchars($baseUrl . '/status.php', ENT_XML1, 'UTF-8') ?></loc>
@@ -22,7 +25,8 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 <?php
 // Public categories with active mirrors, child categories, or published guides are useful landing pages.
 $categoryStmt = $pdo->query("
-    SELECT c.slug
+    SELECT c.slug,
+        (SELECT MAX(a.updated_at) FROM cms_articles a WHERE a.category_id = c.id AND a.status = 'published') AS guide_updated_at
     FROM categories c
     WHERE EXISTS (
         SELECT 1
@@ -41,6 +45,8 @@ foreach ($categoryStmt as $category):
 ?>
   <url>
     <loc><?= htmlspecialchars($baseUrl . '/category.php?slug=' . rawurlencode($category['slug']), ENT_XML1, 'UTF-8') ?></loc>
+    <?php $categoryUpdated = !empty($category['guide_updated_at']) ? strtotime((string)$category['guide_updated_at']) : false; ?>
+    <?php if ($categoryUpdated !== false): ?><lastmod><?= gmdate('Y-m-d', $categoryUpdated) ?></lastmod><?php endif; ?>
   </url>
 <?php endforeach; ?>
 
