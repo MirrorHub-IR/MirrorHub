@@ -80,3 +80,15 @@ function cmsRenderMarkdown(PDO $pdo, string $source): string {
     if ($code) $out.='<pre><code>'.cmsEsc(implode("\n",$codeLines)).'</code></pre>';
     $flush(); $close(); return $out;
 }
+
+
+/**
+ * Delete one CMS article and report whether a row was actually removed.
+ * Keeping the id validation here prevents accidental full-table operations.
+ */
+function cmsDeleteArticle(PDO $pdo, int $articleId): bool {
+    if ($articleId < 1) return false;
+    $statement = $pdo->prepare('DELETE FROM cms_articles WHERE id = ?');
+    $statement->execute([$articleId]);
+    return $statement->rowCount() === 1;
+}
