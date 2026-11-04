@@ -24,6 +24,11 @@ $apiDocs = file_get_contents($root . '/docs/api-v1.md') ?: '';
 $apiExample = file_get_contents($root . '/examples/api-v1.sh') ?: '';
 $apiSpec = json_decode(file_get_contents($root . '/docs/openapi-v1.json') ?: '', true);
 $installation = file_get_contents($root . '/includes/installation.php') ?: '';
+$donate = file_get_contents($root . '/includes/donate.php') ?: '';
+$donatePage = file_get_contents($root . '/donate.php') ?: '';
+$donateAdmin = file_get_contents($root . '/admin/donate.php') ?: '';
+$layout = file_get_contents($root . '/includes/layout.php') ?: '';
+
 $assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
 $assert(!is_file($root . '/install.php'), 'Legacy install.php must be removed.');
 $assert(str_contains($installation, 'function mirrorhubInstallationStatus'), 'Installation-state detector is missing.');
@@ -36,6 +41,14 @@ $assert(str_contains($setup, 'mirrorhubSetupWriteConfig'), 'Setup must persist l
 $assert(str_contains($setup, 'password_hash($adminPassword'), 'Setup must hash the administrator password.');
 $assert(str_contains($setup, 'session_regenerate_id(true)'), 'Setup must regenerate the session ID before admin login.');
 $assert(str_contains($setup, '@unlink(__FILE__)'), 'Setup should remove its public installer after success.');
+$assert(str_contains($donate, 'function ensureDonateSchema'), 'Donate settings schema helper is missing.');
+$assert(str_contains($donate, 'function donateValidateUrl'), 'Donate URL validation helper is missing.');
+$assert(str_contains($donateAdmin, 'verifyCsrfToken') && str_contains($donateAdmin, 'generateCsrfToken'), 'Donate settings must use CSRF protection.');
+$assert(str_contains($donateAdmin, 'donateSaveSettings'), 'Donate settings must be persisted.');
+$assert(str_contains($donatePage, 'htmlspecialchars') && str_contains($donatePage, 'rel="noopener noreferrer"'), 'Public contact links must be escaped and opened safely.');
+$assert(str_contains($layout, '/admin/donate.php') && str_contains($layout, '/donate.php'), 'Donate links must be present in admin and public navigation.');
+$assert(str_contains($backup, 'donate_settings') && str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 4'), 'Donate settings must be included in backups.');
+
 $assert(str_contains($htaccess, '.mirrorhub-installed'), 'Apache must deny direct reads of the installation lock.');
 $assert(str_contains($config, 'MIRRORHUB_DB_PORT'), 'Database port must be configurable through the environment.');
 
@@ -91,6 +104,13 @@ $assert(str_contains($apiDocs, '۸ تلاش') && str_contains($apiExample, 'API_
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
 require_once $root . '/includes/monitoring.php';
+require_once $root . '/includes/donate.php';
+$assert(donateValidateUrl('https://t.me/mirrorhub'), 'Valid HTTPS Telegram links should be accepted.');
+$assert(donateValidateUrl('mailto:hello@example.com'), 'Valid mailto contact links should be accepted.');
+$assert(!donateValidateUrl('javascript:alert(1)'), 'JavaScript URLs must be rejected for Donate links.');
+$assert(!donateValidateUrl('http://example.com'), 'Plain HTTP links must be rejected for Donate links.');
+$assert(!donateValidateUrl('https://user:pass@example.com'), 'Credential-bearing URLs must be rejected for Donate links.');
+
 
 $badPath = monitorNormalizeRepositoryPath('custom', '../private');
 $assert(!$badPath['valid'], 'Repository metadata path traversal must be rejected.');

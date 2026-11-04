@@ -16,6 +16,9 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
   <url>
     <loc><?= htmlspecialchars($baseUrl . '/status.php', ENT_XML1, 'UTF-8') ?></loc>
   </url>
+  <url>
+    <loc><?= htmlspecialchars($baseUrl . '/donate.php', ENT_XML1, 'UTF-8') ?></loc>
+  </url>
 <?php
 // Public categories with active mirrors, child categories, or published guides are useful landing pages.
 $categoryStmt = $pdo->query("

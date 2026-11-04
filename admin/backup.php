@@ -4,12 +4,15 @@ require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
 
-const MIRRORHUB_BACKUP_VERSION = 3;
+require_once __DIR__ . '/../includes/donate.php';
+ensureDonateSchema($pdo);
+
+const MIRRORHUB_BACKUP_VERSION = 4;
 $backupTables = [
     'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
     'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
     'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings',
-    'mirror_repository_health',
+    'mirror_repository_health', 'donate_settings',
 ];
 
 function backupTableExists(PDO $pdo, string $table): bool {
@@ -148,15 +151,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
     try {
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
         $backupVersion = (int)($backup['version'] ?? 0);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, MIRRORHUB_BACKUP_VERSION], true)) {
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
 
         $legacyMissingTables = [];
         $legacyTablesByVersion = [
-            1 => ['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'],
-            2 => ['mirror_repository_health'],
+            1 => ['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health', 'donate_settings'],
+            2 => ['mirror_repository_health', 'donate_settings'],
+            3 => ['donate_settings'],
         ];
         $legacyTables = $legacyTablesByVersion[$backupVersion] ?? [];
 
