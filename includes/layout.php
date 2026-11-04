@@ -44,6 +44,7 @@ function renderHeader($title = '', $isAdmin = false) {
     $structuredData = [[
         '@context' => 'https://schema.org',
         '@type' => 'WebSite',
+        '@id' => $siteUrl,
         'name' => $siteName,
         'url' => $siteUrl,
         'inLanguage' => 'fa-IR',
