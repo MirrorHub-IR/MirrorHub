@@ -28,6 +28,11 @@ $donate = file_get_contents($root . '/includes/donate.php') ?: '';
 $donatePage = file_get_contents($root . '/donate.php') ?: '';
 $donateAdmin = file_get_contents($root . '/admin/donate.php') ?: '';
 $layout = file_get_contents($root . '/includes/layout.php') ?: '';
+$cms = file_get_contents($root . '/includes/cms.php') ?: '';
+$cmsAdmin = file_get_contents($root . '/admin/pages.php') ?: '';
+$docsPage = file_get_contents($root . '/docs.php') ?: '';
+$sitemap = file_get_contents($root . '/sitemap.php') ?: '';
+$robots = file_get_contents($root . '/robots.php') ?: '';
 
 $assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
 $assert(!is_file($root . '/install.php'), 'Legacy install.php must be removed.');
@@ -75,7 +80,7 @@ $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct 
 foreach (['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'] as $table) {
     $assert(str_contains($backup, "'" . $table . "'"), 'Backup coverage missing table: ' . $table);
 }
-$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 3'), 'Backup format version was not incremented.');
+$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 4'), 'Backup format version must match the Donate settings migration.');
 $assert(str_contains($backup, 'legacyMissingTables'), 'Legacy backup safety guard is missing.');
 $assert(str_contains($monitoring, 'mirror_repository_health'), 'Repository-health schema is missing.');
 $assert(str_contains($repoHealth, 'function monitorEvaluateRepositoryHealth'), 'Repository-health evaluator is missing.');
@@ -139,6 +144,24 @@ $assert(count($protocols) === 2, 'Protocol normalizer smoke test failed.');
 
 $escaped = cmsInline('<script>alert(1)</script>');
 $assert(str_contains($escaped, '&lt;script&gt;'), 'CMS inline renderer must escape raw HTML.');
+$assert(str_contains($cms, 'function cmsDeleteArticle'), 'CMS deletion helper is missing.');
+$assert(str_contains($cmsAdmin, 'name="article_id"'), 'CMS delete form must submit the article id in POST.');
+$assert(str_contains($cmsAdmin, 'verifyCsrfToken') && str_contains($cmsAdmin, 'cmsDeleteArticle'), 'CMS deletion must remain CSRF-protected and use the deletion helper.');
+$assert(str_contains($docsPage, "'article_schema'"), 'Public guides must publish Article structured data.');
+$assert(str_contains($layout, 'twitter:description') && str_contains($layout, 'application/ld+json'), 'Global social metadata or JSON-LD output is missing.');
+$assert(str_contains($sitemap, 'MAX(updated_at)') && str_contains($sitemap, '<lastmod>'), 'Guide sitemap must expose accurate last-modified dates.');
+$assert(str_contains($robots, '/setup.php'), 'Robots rules must keep the installer out of crawling.');
+
+if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    $cmsTestPdo = new PDO('sqlite::memory:');
+    $cmsTestPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $cmsTestPdo->exec('CREATE TABLE cms_articles (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL)');
+    $cmsTestPdo->exec("INSERT INTO cms_articles (title) VALUES ('مستند آزمایشی')");
+    $cmsTestId = (int)$cmsTestPdo->lastInsertId();
+    $assert(cmsDeleteArticle($cmsTestPdo, $cmsTestId), 'CMS deletion must return true when one article is removed.');
+    $assert(!cmsDeleteArticle($cmsTestPdo, $cmsTestId), 'CMS deletion must report false when an article does not exist.');
+    $assert(!cmsDeleteArticle($cmsTestPdo, 0), 'CMS deletion must reject non-positive article ids.');
+}
 
 require_once $root . '/includes/api-v1.php';
 $validApiSuggestion = mhApiValidateContribution([
