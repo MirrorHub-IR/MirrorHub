@@ -28,13 +28,32 @@ $stmt=$pdo->prepare("SELECT a.*,c.name AS category_name,c.slug AS category_slug 
 $stmt->execute([$slug]); $article=$stmt->fetch();
 if (!$article) { http_response_code(404); $GLOBALS['pageSeo']=['title'=>'مستندات پیدا نشد | MirrorHub','description'=>'صفحهٔ موردنظر در MirrorHub پیدا نشد یا منتشر نشده است.','robots'=>'noindex,follow']; renderHeader('مستندات پیدا نشد'); echo '<section class="section"><h1>مستندات پیدا نشد</h1><p>این مستند وجود ندارد یا منتشر نشده است.</p><a href="'.htmlspecialchars(SITE_URL).'/guides/">بازگشت به مستندات</a></section>'; renderFooter(); exit; }
 $articleCanonical = rtrim(SITE_URL, '/') . '/guides/' . rawurlencode($article['slug']);
+$articlePublishedTimestamp = strtotime((string)($article['published_at'] ?: $article['created_at']));
+$articleModifiedTimestamp = strtotime((string)($article['updated_at'] ?: $article['published_at'] ?: $article['created_at']));
+$articleMetaDescription = trim((string)($article['seo_description'] ?: ($article['excerpt'] ?: 'راهنمای ' . $article['title'] . ' برای استفاده از میرورها در MirrorHub')));
 $GLOBALS['pageSeo'] = [
     'title' => $article['seo_title'] ?: ($article['title'] . ' | راهنمای MirrorHub'),
-    'description' => $article['seo_description'] ?: ($article['excerpt'] ?: 'راهنمای ' . $article['title'] . ' برای استفاده از میرورها در MirrorHub'),
+    'description' => $articleMetaDescription,
     'canonical' => $articleCanonical,
     'og_type' => 'article',
     'published' => $article['published_at'],
     'modified' => $article['updated_at'],
+    'article_schema' => [
+        '@type' => 'TechArticle',
+        'headline' => (string)$article['title'],
+        'description' => $articleMetaDescription,
+        'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $articleCanonical],
+        'inLanguage' => 'fa-IR',
+        'isAccessibleForFree' => true,
+        'author' => ['@type' => 'Organization', 'name' => SITE_NAME],
+        'publisher' => [
+            '@type' => 'Organization',
+            'name' => SITE_NAME,
+            'logo' => ['@type' => 'ImageObject', 'url' => rtrim(SITE_URL, '/') . '/assets/logo.png'],
+        ],
+        'image' => [rtrim(SITE_URL, '/') . '/assets/logo.png'],
+    ] + ($articlePublishedTimestamp !== false ? ['datePublished' => date('c', $articlePublishedTimestamp)] : [])
+      + ($articleModifiedTimestamp !== false ? ['dateModified' => date('c', $articleModifiedTimestamp)] : []),
     'styles' => ['css/cms.css'],
     'breadcrumbs' => array_values(array_filter([
         ['name' => 'خانه', 'url' => rtrim(SITE_URL, '/') . '/'],

@@ -5,7 +5,8 @@ require_once '../includes/layout.php';
 require_once '../includes/cms.php';
 requireAdmin();
 
-$action = $_GET['action'] ?? 'list';
+$action = (string)($_GET['action'] ?? 'list');
+if (!in_array($action, ['list', 'add', 'edit'], true)) $action = 'list';
 $id = max(0, (int)($_GET['id'] ?? 0));
 $errors = [];
 $article = ['title'=>'','slug'=>'','excerpt'=>'','body_markdown'=>'','seo_title'=>'','seo_description'=>'','category_id'=>'','status'=>'draft'];
@@ -15,10 +16,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('error', 'توکن امنیتی نامعتبر است.');
         redirect(SITE_URL . '/admin/pages.php');
     }
-    $reqAction = $_POST['req_action'] ?? 'save';
-    if ($reqAction === 'delete' && $id) {
-        $pdo->prepare("DELETE FROM cms_articles WHERE id = ?")->execute([$id]);
-        flash('success', 'مقاله حذف شد.');
+    $reqAction = (string)($_POST['req_action'] ?? 'save');
+    if ($reqAction === 'delete') {
+        $deleteId = filter_var($_POST['article_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        try {
+            $deleted = $deleteId !== false && cmsDeleteArticle($pdo, (int)$deleteId);
+            if ($deleted) {
+                flash('success', 'مقاله با موفقیت حذف شد.');
+            } else {
+                flash('error', 'مقاله پیدا نشد یا قبلاً حذف شده است؛ فهرست مستندات را به‌روزرسانی کنید.');
+            }
+        } catch (Throwable $deleteError) {
+            error_log('MirrorHub CMS article deletion failed: ' . $deleteError->getMessage());
+            flash('error', 'حذف مقاله انجام نشد. خطای پایگاه داده ثبت شد؛ دوباره تلاش کنید.');
+        }
+        redirect(SITE_URL . '/admin/pages.php');
+    }
+    if ($reqAction !== 'save') {
+        flash('error', 'درخواست نامعتبر است.');
         redirect(SITE_URL . '/admin/pages.php');
     }
     $article = [
@@ -61,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success', $article['status']==='published' ? 'مقاله ذخیره و منتشر شد.' : 'پیش‌نویس ذخیره شد.');
         redirect(SITE_URL.'/admin/pages.php?action=edit&id='.$id);
     }
-} elseif (in_array($action,['edit','delete'],true) && $id) {
+} elseif ($action === 'edit' && $id) {
     $q=$pdo->prepare("SELECT * FROM cms_articles WHERE id=?"); $q->execute([$id]); $row=$q->fetch();
     if (!$row) { flash('error','مقاله پیدا نشد.'); redirect(SITE_URL.'/admin/pages.php'); }
     $article=$row;
@@ -94,7 +109,7 @@ renderHeader('مدیریت راهنماها', true);
 </form>
 <?php else: ?>
 <div class="table-responsive"><table class="data-table"><thead><tr><th>عنوان</th><th>دسته</th><th>وضعیت</th><th>آخرین ویرایش</th><th>عملیات</th></tr></thead><tbody>
-<?php foreach($articles as $a): ?><tr><td data-label="عنوان"><?= htmlspecialchars($a['title']) ?><small class="cms-table-slug">/guides/<?= htmlspecialchars($a['slug']) ?></small></td><td data-label="دسته"><?= htmlspecialchars($a['category_name'] ?? '—') ?></td><td data-label="وضعیت"><?= $a['status']==='published'?'منتشرشده':'پیش‌نویس' ?></td><td data-label="آخرین ویرایش"><?= htmlspecialchars(formatDate($a['updated_at'], 'Y/m/d H:i')) ?></td><td data-label="عملیات" class="actions"><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/pages.php?action=edit&id=<?= (int)$a['id'] ?>">ویرایش</a> <form method="post" action="<?= SITE_URL ?>/admin/pages.php?id=<?= (int)$a['id'] ?>" class="cms-inline-form" onsubmit="return confirm('مقاله حذف شود؟')"><input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken()) ?>"><button class="btn btn-sm btn-danger" name="req_action" value="delete">حذف</button></form><?php if($a['status']==='published'): ?> <a class="btn btn-sm btn-outline" target="_blank" rel="noopener" href="<?= SITE_URL ?>/guides/<?= rawurlencode($a['slug']) ?>">نمایش</a><?php endif; ?></td></tr><?php endforeach; ?>
+<?php foreach($articles as $a): ?><tr><td data-label="عنوان"><?= htmlspecialchars($a['title']) ?><small class="cms-table-slug">/guides/<?= htmlspecialchars($a['slug']) ?></small></td><td data-label="دسته"><?= htmlspecialchars($a['category_name'] ?? '—') ?></td><td data-label="وضعیت"><?= $a['status']==='published'?'منتشرشده':'پیش‌نویس' ?></td><td data-label="آخرین ویرایش"><?= htmlspecialchars(formatDate($a['updated_at'], 'Y/m/d H:i')) ?></td><td data-label="عملیات" class="actions"><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/admin/pages.php?action=edit&id=<?= (int)$a['id'] ?>">ویرایش</a> <form method="post" action="<?= SITE_URL ?>/admin/pages.php" class="cms-inline-form" onsubmit="return confirm('این مستند برای همیشه حذف شود؟')"><input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="article_id" value="<?= (int)$a['id'] ?>"><button class="btn btn-sm btn-danger" type="submit" name="req_action" value="delete" aria-label="حذف مستند <?= htmlspecialchars($a['title'], ENT_QUOTES, 'UTF-8') ?>">حذف</button></form><?php if($a['status']==='published'): ?> <a class="btn btn-sm btn-outline" target="_blank" rel="noopener" href="<?= SITE_URL ?>/guides/<?= rawurlencode($a['slug']) ?>">نمایش</a><?php endif; ?></td></tr><?php endforeach; ?>
 </tbody></table></div>
 <?php if(!$articles): ?><p class="empty-state">هنوز مقاله‌ای نوشته نشده است.</p><?php endif; ?>
 <?php endif; ?>

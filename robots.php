@@ -11,6 +11,7 @@ if ($prefix === '/') $prefix = '';
 echo "User-agent: *\n";
 echo "Allow: " . ($prefix === '' ? '/' : $prefix . '/') . "\n";
 echo "Disallow: " . $prefix . "/admin/\n";
+echo "Disallow: " . $prefix . "/setup.php\n";
 echo "Disallow: " . $prefix . "/install.php\n";
 echo "Disallow: " . $prefix . "/cron.php\n";
 echo "Sitemap: " . rtrim(SITE_URL, '/') . "/sitemap.xml\n";
