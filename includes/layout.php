@@ -139,6 +139,11 @@ function renderHeader($title = '', $isAdmin = false) {
                 <a href="<?= SITE_URL ?>/admin/users.php" class="<?= $currentPage === 'users.php' ? 'active' : '' ?>" <?= $currentPage === 'users.php' ? 'aria-current="page"' : '' ?>>
                     <?= icon('users', 18) ?><span>کاربران</span>
                 </a>
+
+                <span class="admin-nav-heading">ارتباط با جامعه</span>
+                <a href="<?= SITE_URL ?>/admin/donate.php" class="<?= $currentPage === 'donate.php' ? 'active' : '' ?>" <?= $currentPage === 'donate.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('heart', 18) ?><span>صفحهٔ Donate</span>
+                </a>
             </nav>
 
             <div class="admin-sidebar-footer">
@@ -205,6 +210,9 @@ function renderHeader($title = '', $isAdmin = false) {
                 <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>" <?= $currentPage === 'suggest.php' ? 'aria-current="page"' : '' ?>>
                     <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
                 </a>
+                <a href="<?= SITE_URL ?>/donate.php" class="nav-donate <?= $currentPage === 'donate.php' ? 'active' : '' ?>" <?= $currentPage === 'donate.php' ? 'aria-current="page"' : '' ?>>
+                    <?= icon('heart', 15) ?><span>حمایت از پروژه</span>
+                </a>
             </nav>
         </div>
     </header>
@@ -243,7 +251,7 @@ function renderFooter() {
                 </div>
             </div>
             <p class="footer-copy">&copy; <?= jalaliFormatDate(time(), 'Y') ?> <?= htmlspecialchars(SITE_NAME) ?>. تمامی حقوق محفوظ است.</p>
-            <p class="footer-made">ساخته شده با <span class="heart"><?= icon('heart', 14) ?></span> در ایران</p>
+            <p class="footer-made">ساخته شده با <span class="heart"><?= icon('heart', 14) ?></span> در ایران · <a href="<?= SITE_URL ?>/donate.php">حمایت از پروژه</a></p>
         </div>
     </footer>
     <?php endif; ?>
