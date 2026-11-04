@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success', $article['status']==='published' ? 'مقاله ذخیره و منتشر شد.' : 'پیش‌نویس ذخیره شد.');
         redirect(SITE_URL.'/admin/pages.php?action=edit&id='.$id);
     }
-} elseif (in_array($action,['edit','delete'],true) && $id) {
+} elseif ($action === 'edit' && $id) {
     $q=$pdo->prepare("SELECT * FROM cms_articles WHERE id=?"); $q->execute([$id]); $row=$q->fetch();
     if (!$row) { flash('error','مقاله پیدا نشد.'); redirect(SITE_URL.'/admin/pages.php'); }
     $article=$row;
