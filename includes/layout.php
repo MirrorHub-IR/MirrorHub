@@ -19,6 +19,10 @@ function renderHeader($title = '', $isAdmin = false) {
             ? $title . ' در ' . $siteName . '؛ فهرست میرورهای نرم‌افزاری و وضعیت آن‌ها.'
             : $siteName . '؛ فهرست میرورهای نرم‌افزاری و راهنماهای استفاده از مخازن.';
     }
+    $metaDescription = trim((string)(preg_replace('/\s+/u', ' ', $metaDescription) ?? $metaDescription));
+    $metaDescription = function_exists('mb_substr')
+        ? mb_substr($metaDescription, 0, 180, 'UTF-8')
+        : substr($metaDescription, 0, 180);
     $robotsContent = trim((string)($seo['robots'] ?? 'index,follow'));
     if ($isAdmin) $robotsContent = 'noindex,nofollow';
     $canonicalUrl = trim((string)($seo['canonical'] ?? ''));
@@ -34,13 +38,41 @@ function renderHeader($title = '', $isAdmin = false) {
     if ($isAdmin) $extraStyles[] = 'css/admin.css';
     $extraStyles = array_values(array_unique($extraStyles));
     $ogType = (($seo['og_type'] ?? '') === 'article') ? 'article' : 'website';
+    $siteUrl = rtrim(SITE_URL, '/') . '/';
+    $socialImageUrl = rtrim(SITE_URL, '/') . '/assets/logo.png';
+    $organizationId = rtrim(SITE_URL, '/') . '/#organization';
     $structuredData = [[
         '@context' => 'https://schema.org',
         '@type' => 'WebSite',
         'name' => $siteName,
-        'url' => rtrim(SITE_URL, '/') . '/',
+        'url' => $siteUrl,
         'inLanguage' => 'fa-IR',
+        'publisher' => ['@id' => $organizationId],
+    ], [
+        '@context' => 'https://schema.org',
+        '@type' => 'Organization',
+        '@id' => $organizationId,
+        'name' => $siteName,
+        'url' => $siteUrl,
+        'logo' => ['@type' => 'ImageObject', 'url' => $socialImageUrl],
     ]];
+    if (!$isAdmin && $canonicalUrl !== '') {
+        $structuredData[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            'name' => $pageTitle,
+            'description' => $metaDescription,
+            'url' => $canonicalUrl,
+            'inLanguage' => 'fa-IR',
+            'isPartOf' => ['@type' => 'WebSite', '@id' => $siteUrl],
+        ];
+    }
+    if (!$isAdmin && is_array($seo['article_schema'] ?? null)) {
+        $articleSchema = $seo['article_schema'];
+        $articleSchema['@context'] = 'https://schema.org';
+        $articleSchema['@type'] = $articleSchema['@type'] ?? 'Article';
+        $structuredData[] = $articleSchema;
+    }
     if (!$isAdmin && !empty($seo['breadcrumbs']) && is_array($seo['breadcrumbs'])) {
         $items = [];
         foreach (array_values($seo['breadcrumbs']) as $index => $crumb) {
@@ -79,14 +111,18 @@ function renderHeader($title = '', $isAdmin = false) {
     <link rel="apple-touch-icon" href="<?= asset('logo.png') ?>">
     <meta property="og:locale" content="fa_IR">
     <?php if ($canonicalUrl !== ''): ?><meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($socialImageUrl, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:site_name" content="<?= htmlspecialchars($siteName) ?>">
     <meta property="og:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
     <?php if (!empty($seo['published'])): ?><meta property="article:published_time" content="<?= htmlspecialchars((string)$seo['published'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <?php if (!empty($seo['modified'])): ?><meta property="article:modified_time" content="<?= htmlspecialchars((string)$seo['modified'], ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
-    <meta property="og:image" content="<?= SITE_URL ?>/assets/logo.png">
+    <meta property="og:image" content="<?= htmlspecialchars($socialImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:image:alt" content="<?= htmlspecialchars($siteName . ' — نشان پروژه', ENT_QUOTES, 'UTF-8') ?>">
     <?php if (!$isAdmin): foreach ($structuredData as $schema): ?>
     <script type="application/ld+json"><?= json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
     <?php endforeach; endif; ?>
