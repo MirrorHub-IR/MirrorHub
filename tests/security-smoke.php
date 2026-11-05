@@ -33,6 +33,11 @@ $cmsAdmin = file_get_contents($root . '/admin/pages.php') ?: '';
 $docsPage = file_get_contents($root . '/docs.php') ?: '';
 $sitemap = file_get_contents($root . '/sitemap.php') ?: '';
 $robots = file_get_contents($root . '/robots.php') ?: '';
+$mirrorsDirectory = file_get_contents($root . '/mirrors.php') ?: '';
+$softwareDirectory = file_get_contents($root . '/categories.php') ?: '';
+$providerDirectory = file_get_contents($root . '/providers.php') ?: '';
+$contributePage = file_get_contents($root . '/contribute.php') ?: '';
+$siteJs = file_get_contents($root . '/assets/js/site.js') ?: '';
 
 $assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
 $assert(!is_file($root . '/install.php'), 'Legacy install.php must be removed.');
@@ -151,6 +156,17 @@ $assert(str_contains($docsPage, "'article_schema'"), 'Public guides must publish
 $assert(str_contains($layout, 'twitter:description') && str_contains($layout, 'application/ld+json'), 'Global social metadata or JSON-LD output is missing.');
 $assert(str_contains($sitemap, 'MAX(updated_at)') && str_contains($sitemap, '<lastmod>'), 'Guide sitemap must expose accurate last-modified dates.');
 $assert(str_contains($robots, '/setup.php'), 'Robots rules must keep the installer out of crawling.');
+$assert(str_contains($layout, '/mirrors/') && str_contains($layout, '/categories/') && str_contains($layout, '/providers/'), 'Primary navigation must expose the separate mirror, category and provider pages.');
+$assert(str_contains($layout, '/status/') && str_contains($layout, '/guides/') && str_contains($layout, '/contribute/'), 'Primary navigation must expose status, guides and contribution pages.');
+$assert(str_contains($htaccess, 'RewriteRule ^mirrors/?$ mirrors.php') && str_contains($htaccess, 'RewriteRule ^categories/?$ categories.php'), 'Clean directory routes are missing.');
+$assert(str_contains($htaccess, 'RewriteRule ^providers/?$ providers.php') && str_contains($htaccess, 'RewriteRule ^contribute/?$ contribute.php'), 'Clean provider or contribution route is missing.');
+$assert(str_contains($mirrorsDirectory, 'COUNT(*)') && str_contains($mirrorsDirectory, 'LIMIT {$perPage} OFFSET {$offset}'), 'Mirror directory must count and paginate results.');
+$assert(str_contains($mirrorsDirectory, 'category_id') && str_contains($mirrorsDirectory, 'protocol') && str_contains($mirrorsDirectory, 'mirror_status'), 'Mirror directory filters are incomplete.');
+$assert(str_contains($softwareDirectory, "c.type='software'") && str_contains($providerDirectory, "c.type='provider'"), 'Software categories and providers must have separate pages.');
+$assert(str_contains($contributePage, '/suggest.php') && str_contains($contributePage, 'github.com/MirrorHub-IR/MirrorHub'), 'Contribution page must link to the submission form and source repository.');
+$assert(str_contains($homePage, 'home-explore-grid') && str_contains($homePage, 'home-search'), 'Homepage discovery layout is missing.');
+$assert(str_contains($siteJs, "event.key === 'Escape'") && str_contains($siteJs, "aria-expanded"), 'Responsive navigation must support Escape and expose its expanded state.');
+$assert(str_contains($sitemap, "baseUrl . '/mirrors/'") && str_contains($sitemap, "baseUrl . '/providers/'"), 'Sitemap must include the new directory landing pages.');
 
 if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
     $cmsTestPdo = new PDO('sqlite::memory:');

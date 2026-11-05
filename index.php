@@ -17,165 +17,106 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/layout.php';
 
-// Get software categories
-$softwareCategories = $pdo->query(
-    "SELECT c.*, p.name AS parent_name, p.slug AS parent_slug
+// Fast overview metrics for the homepage.
+$homeStats = $pdo->query("
+    SELECT
+        (SELECT COUNT(*) FROM mirrors WHERE status='active') AS mirrors,
+        (SELECT COUNT(*) FROM categories WHERE type='software') AS software_categories,
+        (SELECT COUNT(*) FROM categories WHERE type='provider') AS providers,
+        (SELECT COUNT(*) FROM cms_articles WHERE status='published') AS guides
+")->fetch();
+$featuredCategories = $pdo->query("
+    SELECT c.id,c.name,c.slug,c.description,c.icon,
+        (SELECT COUNT(DISTINCT m.id) FROM mirror_categories mc INNER JOIN mirrors m ON m.id=mc.mirror_id AND m.status='active' WHERE mc.category_id=c.id) AS mirror_count
     FROM categories c
-    LEFT JOIN categories p ON p.id = c.parent_id
-    WHERE c.type = 'software'
-    ORDER BY c.parent_id IS NULL DESC, c.sort_order ASC, c.name ASC"
-)->fetchAll();
-
-// Get provider categories
-$providerCategories = $pdo->query(
-    "SELECT c.*, p.name AS parent_name, p.slug AS parent_slug
-    FROM categories c
-    LEFT JOIN categories p ON p.id = c.parent_id
-    WHERE c.type = 'provider'
-    ORDER BY c.parent_id IS NULL DESC, c.sort_order ASC, c.name ASC"
-)->fetchAll();
-
-$stmt = $pdo->query("SELECT * FROM mirrors WHERE status = 'active' ORDER BY created_at DESC LIMIT 12");
-$recentMirrors = $stmt->fetchAll();
-$recentIds = array_column($recentMirrors, 'id');
-$recentCategoryMap = getMirrorCategoryTagsMap($pdo, $recentIds);
-$recentProtocolMap = getMirrorProtocolsMap($pdo, $recentIds);
-foreach ($recentMirrors as &$mirror) {
-    $id = (int)$mirror['id'];
-    $mirror['categories'] = $recentCategoryMap[$id] ?? [];
-    $mirror['protocols'] = $recentProtocolMap[$id] ?? [];
-}
-unset($mirror);
-
-// وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
-$monitorStatuses = monitorStatusMap($pdo, $recentIds);
+    WHERE c.type='software'
+    ORDER BY mirror_count DESC,c.sort_order ASC,c.name ASC
+    LIMIT 6
+")->fetchAll();
+$recentMirrors = getRecentMirrors($pdo, 6);
+$recentMirrorIds = array_column($recentMirrors, 'id');
+$monitorStatuses = monitorStatusMap($pdo, $recentMirrorIds);
 
 $GLOBALS['pageSeo'] = [
-    'title' => 'MirrorHub | جست‌وجوی میرورهای نرم‌افزاری و مخازن',
-    'description' => 'در MirrorHub میرورهای نرم‌افزاری و مخازن را پیدا کنید، دسته‌بندی‌ها را مرور کنید و وضعیت ثبت‌شدهٔ سرویس‌ها و راهنماهای راه‌اندازی را ببینید.',
+    'title' => 'MirrorHub | جست‌وجو و پایش میرورهای نرم‌افزاری',
+    'description' => 'میرورهای لینوکس و نرم‌افزارها را پیدا کنید، ارائه‌دهندگان را مرور کنید و وضعیت دسترس‌پذیری مخازن را در MirrorHub ببینید.',
     'canonical' => rtrim(SITE_URL, '/') . '/',
 ];
-
 renderHeader('خانه');
 ?>
 
-<section class="hero">
-    <span class="hero-kicker">MirrorHub · فهرست میرورها</span>
-    <h1>میرورهای <span>نرم‌افزاری</span> را آسان‌تر پیدا کنید</h1>
-    <p>جست‌وجوی مخازن و ارائه‌دهندگان، مرور دسته‌بندی‌ها و مشاهدهٔ وضعیت ثبت‌شدهٔ میرورها در یک جا.</p>
-    <form action="<?= SITE_URL ?>/search.php" method="GET" class="search-form" role="search" aria-label="جست‌وجوی میرورها">
-        <input type="search" name="q" aria-label="نام، توضیحات یا آدرس میرور" placeholder="مثلاً Ubuntu، Debian یا آدرس میرور..." required autocomplete="off">
-        <button type="submit">جست‌وجو</button>
-    </form>
-    <p class="search-shortcut"><kbd>/</kbd> برای رفتن سریع به کادر جست‌وجو</p>
-</section>
-
-<?php if (!empty($softwareCategories) || !empty($providerCategories)): ?>
-<section class="category-filter-bar" hidden aria-label="پیدا کردن دسته‌بندی">
-    <label for="category-filter">دنبال کدام دسته‌بندی هستید؟</label>
-    <input id="category-filter" type="search" placeholder="نام نرم‌افزار یا ارائه‌دهنده را بنویسید..." autocomplete="off" >
-    <p id="category-filter-status" role="status" aria-live="polite">برای پیدا کردن سریع‌تر دسته‌بندی، نام آن را بنویسید.</p>
-    <p id="category-filter-empty" class="empty-state" hidden>دسته‌بندی‌ای با این عبارت پیدا نشد.</p>
-</section>
-<?php endif; ?>
-
-<?php if (!empty($softwareCategories)): ?>
-<section class="section category-list-section" id="software-categories" data-category-section>
-    <div class="section-header">
-        <h2 class="section-title">نرم‌افزارها</h2>
-        <span class="badge badge-primary" data-category-count><?= count($softwareCategories) ?> دسته‌بندی</span>
+<section class="home-hero">
+    <div class="home-hero-copy">
+        <span class="home-hero-kicker"><span class="home-live-dot"></span> فهرست و پایش میرورهای نرم‌افزاری</span>
+        <h1>میرور مناسب را <span>سریع‌تر پیدا کنید.</span></h1>
+        <p>یک نقطهٔ شروع برای پیدا کردن مخازن، مقایسهٔ ارائه‌دهندگان و بررسی وضعیت دسترسی میرورها.</p>
+        <form action="<?= SITE_URL ?>/mirrors/" method="get" class="home-search" role="search" aria-label="جست‌وجوی میرورها">
+            <label class="sr-only" for="home-mirror-search">جست‌وجوی میرور</label>
+            <span><?= icon('search', 19) ?></span>
+            <input id="home-mirror-search" type="search" name="q" placeholder="نام توزیع، نرم‌افزار یا آدرس میرور..." autocomplete="off">
+            <button class="btn btn-primary" type="submit">جست‌وجو</button>
+        </form>
+        <div class="home-hero-links"><a href="<?= SITE_URL ?>/mirrors/"><?= icon('server', 15) ?> مرور همهٔ میرورها</a><a href="<?= SITE_URL ?>/categories/"><?= icon('layers', 15) ?> انتخاب توزیع</a></div>
     </div>
-    <div class="grid grid-cols-3">
-        <?php foreach ($softwareCategories as $cat): ?>
-            <div class="card category-card" data-category-card data-search="<?= htmlspecialchars($cat['name'] . ' ' . $cat['slug'] . ' ' . ($cat['description'] ?? '') . ' ' . ($cat['parent_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
-                    <?php if (!empty($cat['icon'])): ?>
-                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon" width="40" height="40" loading="lazy" decoding="async">
-                    <?php endif; ?>
-                    <?php if ($cat['parent_name']): ?>
-                        <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
-                    <?php endif; ?>
-                    <h3><?= htmlspecialchars($cat['name']) ?></h3>
-                    <?php if ($cat['description']): ?>
-                        <p><?= htmlspecialchars(excerpt($cat['description'], 80)) ?></p>
-                    <?php endif; ?>
-                </a>
-            </div>
+    <div class="home-hero-art" aria-hidden="true">
+        <div class="home-orbit home-orbit-one"></div><div class="home-orbit home-orbit-two"></div>
+        <div class="home-art-core"><img src="<?= asset('logo.png') ?>" alt="" width="92" height="92"></div>
+        <span class="home-art-node home-node-one"><?= icon('server', 18) ?></span><span class="home-art-node home-node-two"><?= icon('activity', 18) ?></span><span class="home-art-node home-node-three"><?= icon('package', 18) ?></span>
+    </div>
+</section>
+
+<section class="home-stat-strip" aria-label="نمای کلی MirrorHub">
+    <div><span class="home-stat-icon"><?= icon('server', 17) ?></span><strong><?= number_format((int)$homeStats['mirrors']) ?></strong><small>میرور فعال</small></div>
+    <div><span class="home-stat-icon"><?= icon('layers', 17) ?></span><strong><?= number_format((int)$homeStats['software_categories']) ?></strong><small>دستهٔ نرم‌افزاری</small></div>
+    <div><span class="home-stat-icon"><?= icon('network', 17) ?></span><strong><?= number_format((int)$homeStats['providers']) ?></strong><small>ارائه‌دهنده</small></div>
+    <div><span class="home-stat-icon"><?= icon('book-open', 17) ?></span><strong><?= number_format((int)$homeStats['guides']) ?></strong><small>مستند منتشرشده</small></div>
+</section>
+
+<section class="section home-explore-section">
+    <div class="section-heading-home"><div><span class="eyebrow">شروع سریع</span><h2 class="section-title">از کجا می‌خواهید شروع کنید؟</h2></div><p>بخش موردنیاز را مستقیم باز کنید.</p></div>
+    <div class="home-explore-grid">
+        <a class="home-explore-card home-explore-primary" href="<?= SITE_URL ?>/mirrors/"><span class="home-explore-icon"><?= icon('server', 22) ?></span><strong>همهٔ میرورها</strong><small>جست‌وجو و فیلتر فهرست کامل</small><span class="home-explore-arrow">←</span></a>
+        <a class="home-explore-card" href="<?= SITE_URL ?>/categories/"><span class="home-explore-icon"><?= icon('layers', 22) ?></span><strong>دسته‌بندی‌ها</strong><small>توزیع‌ها و نرم‌افزارها</small><span class="home-explore-arrow">←</span></a>
+        <a class="home-explore-card" href="<?= SITE_URL ?>/providers/"><span class="home-explore-icon"><?= icon('network', 22) ?></span><strong>ارائه‌دهندگان</strong><small>شبکه‌ها و میزبان‌ها</small><span class="home-explore-arrow">←</span></a>
+        <a class="home-explore-card" href="<?= SITE_URL ?>/status/"><span class="home-explore-icon"><?= icon('activity', 22) ?></span><strong>وضعیت میرورها</strong><small>سلامت و دسترس‌پذیری</small><span class="home-explore-arrow">←</span></a>
+        <a class="home-explore-card" href="<?= SITE_URL ?>/guides/"><span class="home-explore-icon"><?= icon('book-open', 22) ?></span><strong>مستندات و راهنماها</strong><small>آموزش نصب و تنظیم مخازن</small><span class="home-explore-arrow">←</span></a>
+        <a class="home-explore-card" href="<?= SITE_URL ?>/contribute/"><span class="home-explore-icon"><?= icon('users', 22) ?></span><strong>مشارکت</strong><small>معرفی میرور و توسعه پروژه</small><span class="home-explore-arrow">←</span></a>
+    </div>
+</section>
+
+<?php if ($featuredCategories): ?>
+<section class="section home-section">
+    <div class="section-heading-home"><div><span class="eyebrow">اکوسیستم نرم‌افزار</span><h2 class="section-title">دسته‌بندی‌های پرمیرور</h2></div><a class="btn btn-outline btn-sm" href="<?= SITE_URL ?>/categories/">همهٔ دسته‌بندی‌ها</a></div>
+    <div class="home-featured-categories">
+        <?php foreach ($featuredCategories as $category): ?>
+        <a class="home-featured-category" href="<?= SITE_URL ?>/category.php?slug=<?= rawurlencode((string)$category['slug']) ?>">
+            <span class="home-featured-category-icon"><?php if (!empty($category['icon'])): ?><img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($category['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" width="34" height="34" loading="lazy" decoding="async"><?php else: ?><?= icon('package', 20) ?><?php endif; ?></span>
+            <span><strong><?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= number_format((int)$category['mirror_count']) ?> میرور فعال</small></span>
+            <span class="home-featured-arrow">←</span>
+        </a>
         <?php endforeach; ?>
     </div>
 </section>
 <?php endif; ?>
 
-<?php if (!empty($providerCategories)): ?>
-<section class="section category-list-section" id="provider-categories" data-category-section>
-    <div class="section-header">
-        <h2 class="section-title">ارائه‌دهندگان</h2>
-        <span class="badge badge-primary" data-category-count><?= count($providerCategories) ?> دسته‌بندی</span>
-    </div>
-    <div class="grid grid-cols-3">
-        <?php foreach ($providerCategories as $cat): ?>
-            <div class="card category-card" data-category-card data-search="<?= htmlspecialchars($cat['name'] . ' ' . $cat['slug'] . ' ' . ($cat['description'] ?? '') . ' ' . ($cat['parent_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($cat['slug']) ?>" class="category-card-link">
-                    <?php if (!empty($cat['icon'])): ?>
-                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" class="category-card-icon">
-                    <?php endif; ?>
-                    <?php if ($cat['parent_name']): ?>
-                        <span class="category-parent-tag"><?= htmlspecialchars($cat['parent_name']) ?></span>
-                    <?php endif; ?>
-                    <h3><?= htmlspecialchars($cat['name']) ?></h3>
-                    <?php if ($cat['description']): ?>
-                        <p><?= htmlspecialchars(excerpt($cat['description'], 80)) ?></p>
-                    <?php endif; ?>
-                </a>
-            </div>
-        <?php endforeach; ?>
-    </div>
-</section>
-<?php endif; ?>
-
-<?php if (empty($softwareCategories) && empty($providerCategories)): ?>
-<section class="section">
-    <p class="empty-state">هنوز دسته‌بندی‌ای ایجاد نشده است.</p>
-</section>
-<?php endif; ?>
-
-<?php if (!empty($recentMirrors)): ?>
-<section class="section">
-    <div class="section-header">
-        <h2 class="section-title">آخرین میرورهای اضافه شده</h2>
-        <a href="<?= SITE_URL ?>/search.php" class="btn btn-sm btn-outline">مشاهده همه</a>
-    </div>
+<?php if ($recentMirrors): ?>
+<section class="section home-section">
+    <div class="section-heading-home"><div><span class="eyebrow">به‌روزرسانی فهرست</span><h2 class="section-title">تازه‌ترین میرورها</h2></div><a class="btn btn-outline btn-sm" href="<?= SITE_URL ?>/mirrors/">نمایش همه</a></div>
     <div class="grid grid-cols-2">
-        <?php foreach ($recentMirrors as $mirror): ?>
-            <?php $names = mirrorDisplayName($mirror); ?>
-            <div class="card mirror-card">
-                <div class="mirror-header">
-                    <div class="mirror-titles">
-                        <h3><?= htmlspecialchars($names['fa']) ?></h3>
-                        <?php if ($names['en'] && $names['en'] !== $names['fa']): ?>
-                            <span class="mirror-name-en"><?= htmlspecialchars($names['en']) ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="mirror-actions">
-                        <a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>" class="btn btn-sm btn-outline">جزئیات</a>
-                        <a href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">بازکردن</a>
-                        <?= pingButton($mirror['url']) ?>
-                    </div>
-                </div>
-                <?php if ($mirror['description']): ?>
-                    <p class="mirror-desc"><?= htmlspecialchars(excerpt($mirror['description'], 120)) ?></p>
-                <?php endif; ?>
-                <div class="mirror-meta">
-                    <?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?>
-                    <?= protocolBadges($mirror['protocols'] ?? getMirrorProtocols($pdo, $mirror['id'])) ?>
-                    <?php foreach ($mirror['categories'] as $c): ?>
-                        <a href="<?= SITE_URL ?>/category.php?slug=<?= htmlspecialchars($c['slug']) ?>" class="badge badge-primary"><?= htmlspecialchars($c['name']) ?></a>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+        <?php foreach ($recentMirrors as $mirror): $names = mirrorDisplayName($mirror); ?>
+        <article class="card mirror-card">
+            <div class="mirror-header"><div class="mirror-titles"><h3><a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>"><?= htmlspecialchars($names['fa'], ENT_QUOTES, 'UTF-8') ?></a></h3><?php if ($names['en'] && $names['en'] !== $names['fa']): ?><span class="mirror-name-en"><?= htmlspecialchars($names['en'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?></div><div class="mirror-actions"><a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>" class="btn btn-sm btn-outline">جزئیات</a><a href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">بازکردن</a></div></div>
+            <?php if ($mirror['description']): ?><p class="mirror-desc"><?= htmlspecialchars(excerpt($mirror['description'], 110), ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+            <div class="mirror-meta"><?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?><?= protocolBadges($mirror['protocols'] ?? []) ?><?php foreach ($mirror['categories'] as $category): ?><a href="<?= SITE_URL ?>/category.php?slug=<?= rawurlencode((string)$category['slug']) ?>" class="badge badge-primary"><?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?></a><?php endforeach; ?></div>
+        </article>
         <?php endforeach; ?>
     </div>
 </section>
 <?php endif; ?>
+
+<section class="home-contribute-banner">
+    <div><span class="eyebrow">جامعه‌محور</span><h2>میرور یا اصلاحی برای معرفی دارید؟</h2><p>با ثبت پیشنهاد، اطلاعات را برای بررسی در اختیار تیم MirrorHub قرار دهید.</p></div>
+    <a class="btn btn-primary" href="<?= SITE_URL ?>/contribute/">مشارکت در پروژه <?= icon('arrow-left', 15) ?></a>
+</section>
 
 <?php renderFooter(); ?>

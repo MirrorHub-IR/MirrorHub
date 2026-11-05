@@ -232,24 +232,14 @@ function renderHeader($title = '', $isAdmin = false) {
                 <span></span><span></span><span></span>
             </button>
             <nav id="main-navigation" class="main-nav" aria-label="ناوبری اصلی">
-                <a href="<?= SITE_URL ?>/index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>" <?= $currentPage === 'index.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('home', 15) ?><span>خانه</span>
-                </a>
-                <a href="<?= SITE_URL ?>/search.php" class="<?= $currentPage === 'search.php' ? 'active' : '' ?>" <?= $currentPage === 'search.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('search', 15) ?><span>جستجو</span>
-                </a>
-                <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('activity', 15) ?><span>مستندات</span>
-                </a>
-                <a href="<?= SITE_URL ?>/status.php" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('activity', 15) ?><span>وضعیت سرورها</span>
-                </a>
-                <a href="<?= SITE_URL ?>/suggest.php" class="<?= $currentPage === 'suggest.php' ? 'active' : '' ?>" <?= $currentPage === 'suggest.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('plus-circle', 15) ?><span>پیشنهاد میرور</span>
-                </a>
-                <a href="<?= SITE_URL ?>/donate.php" class="nav-donate <?= $currentPage === 'donate.php' ? 'active' : '' ?>" <?= $currentPage === 'donate.php' ? 'aria-current="page"' : '' ?>>
-                    <?= icon('heart', 15) ?><span>حمایت از پروژه</span>
-                </a>
+                <a href="<?= SITE_URL ?>/" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>" <?= $currentPage === 'index.php' ? 'aria-current="page"' : '' ?>><?= icon('home', 15) ?><span>خانه</span></a>
+                <a href="<?= SITE_URL ?>/mirrors/" class="<?= $currentPage === 'mirrors.php' ? 'active' : '' ?>" <?= $currentPage === 'mirrors.php' ? 'aria-current="page"' : '' ?>><?= icon('server', 15) ?><span>همهٔ میرورها</span></a>
+                <a href="<?= SITE_URL ?>/categories/" class="<?= $currentPage === 'categories.php' ? 'active' : '' ?>" <?= $currentPage === 'categories.php' ? 'aria-current="page"' : '' ?>><?= icon('layers', 15) ?><span>دسته‌بندی‌ها</span></a>
+                <a href="<?= SITE_URL ?>/providers/" class="<?= $currentPage === 'providers.php' ? 'active' : '' ?>" <?= $currentPage === 'providers.php' ? 'aria-current="page"' : '' ?>><?= icon('network', 15) ?><span>ارائه‌دهندگان</span></a>
+                <a href="<?= SITE_URL ?>/status/" class="<?= $currentPage === 'status.php' ? 'active' : '' ?>" <?= $currentPage === 'status.php' ? 'aria-current="page"' : '' ?>><?= icon('activity', 15) ?><span>وضعیت میرورها</span></a>
+                <a href="<?= SITE_URL ?>/guides/" class="<?= $currentPage === 'docs.php' ? 'active' : '' ?>" <?= $currentPage === 'docs.php' ? 'aria-current="page"' : '' ?>><?= icon('book-open', 15) ?><span>مستندات</span></a>
+                <a href="<?= SITE_URL ?>/contribute/" class="<?= in_array($currentPage, ['contribute.php', 'suggest.php'], true) ? 'active' : '' ?>" <?= in_array($currentPage, ['contribute.php', 'suggest.php'], true) ? 'aria-current="page"' : '' ?>><?= icon('users', 15) ?><span>مشارکت</span></a>
+                <a href="<?= SITE_URL ?>/donate.php" class="nav-donate <?= $currentPage === 'donate.php' ? 'active' : '' ?>" <?= $currentPage === 'donate.php' ? 'aria-current="page"' : '' ?>><?= icon('heart', 15) ?><span>حمایت</span></a>
             </nav>
         </div>
     </header>

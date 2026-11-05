@@ -17,7 +17,19 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     <?php if ($latestGuideTimestamp !== false): ?><lastmod><?= gmdate('Y-m-d', $latestGuideTimestamp) ?></lastmod><?php endif; ?>
   </url>
   <url>
-    <loc><?= htmlspecialchars($baseUrl . '/status.php', ENT_XML1, 'UTF-8') ?></loc>
+    <loc><?= htmlspecialchars($baseUrl . '/mirrors/', ENT_XML1, 'UTF-8') ?></loc>
+  </url>
+  <url>
+    <loc><?= htmlspecialchars($baseUrl . '/categories/', ENT_XML1, 'UTF-8') ?></loc>
+  </url>
+  <url>
+    <loc><?= htmlspecialchars($baseUrl . '/providers/', ENT_XML1, 'UTF-8') ?></loc>
+  </url>
+  <url>
+    <loc><?= htmlspecialchars($baseUrl . '/status/', ENT_XML1, 'UTF-8') ?></loc>
+  </url>
+  <url>
+    <loc><?= htmlspecialchars($baseUrl . '/contribute/', ENT_XML1, 'UTF-8') ?></loc>
   </url>
   <url>
     <loc><?= htmlspecialchars($baseUrl . '/donate.php', ENT_XML1, 'UTF-8') ?></loc>
