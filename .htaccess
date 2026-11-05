@@ -8,6 +8,13 @@ RewriteRule ^api/v1/status/([A-Za-z0-9._-]+)/history/?$ api.php?api_version=1&re
 RewriteRule ^api/v1/mirrors/([A-Za-z0-9._-]+)/?$ api.php?api_version=1&resource=mirror&slug=$1 [L,QSA,B]
 RewriteRule ^api/v1/(mirrors|categories|stats|status)/?$ api.php?api_version=1&resource=$1 [L,QSA]
 
+# Stable public site sections
+RewriteRule ^mirrors/?$ mirrors.php [L,QSA]
+RewriteRule ^categories/?$ categories.php [L,QSA]
+RewriteRule ^providers/?$ providers.php [L,QSA]
+RewriteRule ^status/?$ status.php [L,QSA]
+RewriteRule ^contribute/?$ contribute.php [L,QSA]
+
 # Stable public guide URLs
 RewriteRule ^guides/?$ docs.php [L,QSA]
 RewriteRule ^guides/([^/]+)/?$ docs.php?slug=$1 [L,QSA,B]
