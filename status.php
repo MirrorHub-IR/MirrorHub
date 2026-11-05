@@ -27,7 +27,7 @@ if ($summary['down'] > 0) {
 $GLOBALS['pageSeo'] = [
     'title' => 'وضعیت میرورها | پایش و دسترس‌پذیری در MirrorHub',
     'description' => 'وضعیت ثبت‌شدهٔ میرورهای نرم‌افزاری، زمان پاسخ، آپتایم ۳۰ روزه و رخدادهای اخیر را در داشبورد MirrorHub بررسی کنید.',
-    'canonical' => rtrim(SITE_URL, '/') . '/status.php',
+    'canonical' => rtrim(SITE_URL, '/') . '/status/',
 ];
 renderHeader('وضعیت سرورها');
 ?>
