@@ -7,18 +7,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const nav = document.getElementById('main-navigation');
 
     if (header && toggle && nav) {
-        const closeMenu = () => {
+        const menuIsOpen = () => adminMode && adminShell
+            ? adminShell.classList.contains('sidebar-open')
+            : header.classList.contains('nav-open');
+        const closeMenu = (restoreFocus = false) => {
+            if (!menuIsOpen()) return;
             if (adminMode && adminShell) adminShell.classList.remove('sidebar-open');
             else header.classList.remove('nav-open');
             toggle.setAttribute('aria-expanded', 'false');
-            toggle.setAttribute('aria-label', adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منو');
+            toggle.setAttribute('aria-label', adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منوی اصلی');
+            if (restoreFocus) toggle.focus();
         };
         toggle.addEventListener('click', () => {
             const open = adminMode && adminShell
                 ? adminShell.classList.toggle('sidebar-open')
                 : header.classList.toggle('nav-open');
             toggle.setAttribute('aria-expanded', String(open));
-            toggle.setAttribute('aria-label', open ? 'بستن منو' : (adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منو'));
+            toggle.setAttribute('aria-label', open ? 'بستن منو' : (adminMode ? 'باز کردن منوی مدیریت' : 'باز کردن منوی اصلی'));
+            if (open && window.matchMedia('(max-width: 900px)').matches) {
+                const firstLink = nav.querySelector('a[href]');
+                if (firstLink) firstLink.focus();
+            }
         });
         nav.addEventListener('click', event => {
             if (event.target.closest('a')) closeMenu();
@@ -28,11 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (adminMode && adminShell && adminShell.classList.contains('sidebar-open') && (event.target === adminShell || !adminShell.contains(event.target))) closeMenu();
         });
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') closeMenu();
+            if (event.key === 'Escape') closeMenu(true);
         });
         window.addEventListener('resize', () => {
-            const breakpoint = adminMode ? 900 : 900;
-            if (window.innerWidth > breakpoint) closeMenu();
+            if (window.innerWidth > 900) closeMenu();
         }, { passive: true });
     }
 
@@ -40,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
         const active = document.activeElement;
         if (active && (active.matches('input,textarea,select,[contenteditable="true"]'))) return;
-        const input = document.querySelector('.search-form input[name="q"]');
+        const input = document.querySelector('.home-search input[name="q"], .search-form input[name="q"], .search-page-form input[name="q"]');
         if (input) {
             event.preventDefault();
             input.focus();
