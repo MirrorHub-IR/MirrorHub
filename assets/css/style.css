@@ -4471,6 +4471,8 @@ table { max-width: 100%; }
 .donate-channel-icon{display:grid;place-items:center;flex:0 0 54px;width:54px;height:54px;color:var(--accent);border:1px solid rgba(163,214,92,.18);border-radius:16px;background:var(--accent-soft)}
 .donate-channel-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .donate-channel-telegram .donate-channel-icon svg{fill:currentColor;stroke:none}
+.donate-channel-bale .donate-channel-icon{color:#68c89a;border-color:rgba(104,200,154,.25);background:rgba(48,147,103,.13)}
+.donate-bale-mark{display:grid;place-items:center;width:26px;height:26px;font-size:1.65rem;line-height:1;font-weight:900;color:currentColor}
 .donate-channel-content{display:grid;gap:3px;min-width:0}
 .donate-channel-label{color:#87a18d;font-size:.66rem;font-weight:800;letter-spacing:.08em}
 .donate-channel-content strong{color:#eaf4e8;font-size:.98rem;font-weight:800}
