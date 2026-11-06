@@ -28,6 +28,15 @@ if ($settings['telegram_url'] !== '' && donateValidateUrl($settings['telegram_ur
         'url' => $settings['telegram_url'],
     ];
 }
+if ($settings['bale_url'] !== '' && donateValidateUrl($settings['bale_url'])) {
+    $channels[] = [
+        'kind' => 'bale',
+        'title' => 'گفتگو در بله',
+        'label' => 'Bale',
+        'description' => 'برای دنبال کردن خبرها و ارتباط با جامعهٔ پروژه در پیام‌رسان بله.',
+        'url' => $settings['bale_url'],
+    ];
+}
 if ($settings['github_url'] !== '' && donateValidateUrl($settings['github_url'])) {
     $channels[] = [
         'kind' => 'github',
@@ -122,6 +131,8 @@ renderHeader('حمایت از MirrorHub');
                 <span class="donate-channel-icon">
                     <?php if ($channel['kind'] === 'telegram'): ?>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 4.5 18.3 19c-.24 1.03-.86 1.28-1.74.8l-4.82-3.55-2.32 2.23c-.26.26-.48.48-.98.48l.35-4.9 8.92-8.06c.39-.35-.08-.55-.6-.2L6.1 12.77l-4.7-1.47c-1.02-.32-1.04-1.02.21-1.51L20 3.12c.86-.31 1.62.21 1.5 1.38Z"/></svg>
+                    <?php elseif ($channel['kind'] === 'bale'): ?>
+                    <span class="donate-bale-mark" aria-hidden="true">ب</span>
                     <?php elseif ($channel['kind'] === 'github'): ?>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 19 4.77 5.07 5.07 0 0 0 18.91 1S17.73.65 15 2.48a13.38 13.38 0 0 0-7 0C5.27.65 4.09 1 4.09 1A5.07 5.07 0 0 0 4 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 8 18.13V22"/></svg>
                     <?php else: ?>
