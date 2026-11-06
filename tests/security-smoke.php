@@ -38,6 +38,7 @@ $softwareDirectory = file_get_contents($root . '/categories.php') ?: '';
 $providerDirectory = file_get_contents($root . '/providers.php') ?: '';
 $contributePage = file_get_contents($root . '/contribute.php') ?: '';
 $siteJs = file_get_contents($root . '/assets/js/site.js') ?: '';
+$appJs = file_get_contents($root . '/assets/js/app.js') ?: '';
 
 $assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
 $assert(!is_file($root . '/install.php'), 'Legacy install.php must be removed.');
@@ -152,6 +153,13 @@ $assert(str_contains($escaped, '&lt;script&gt;'), 'CMS inline renderer must esca
 $assert(str_contains($cms, 'function cmsDeleteArticle'), 'CMS deletion helper is missing.');
 $assert(str_contains($cmsAdmin, 'name="article_id"'), 'CMS delete form must submit the article id in POST.');
 $assert(str_contains($cmsAdmin, 'verifyCsrfToken') && str_contains($cmsAdmin, 'cmsDeleteArticle'), 'CMS deletion must remain CSRF-protected and use the deletion helper.');
+preg_match_all("/\\bicon\\('([^']+)'/", $homePage, $homepageIconMatches);
+foreach (array_unique($homepageIconMatches[1] ?? []) as $homepageIconName) {
+    $assert(str_contains($functions, "'" . $homepageIconName . "' =>"), 'Homepage icon is missing from the SVG registry: ' . $homepageIconName);
+}
+$assert(str_contains($cmsAdmin, 'name="req_action" value="delete"'), 'CMS delete form must send an explicit delete action independently of its submit button.');
+$assert(str_contains($appJs, 'form.requestSubmit(submitter)'), 'Confirmed forms must preserve the clicked submitter when they are re-submitted.');
+$assert(str_contains($appJs, 'submitter.name') && str_contains($appJs, 'submitter.value'), 'Older-browser form submission fallback must preserve submitter data.');
 $assert(str_contains($docsPage, "'article_schema'"), 'Public guides must publish Article structured data.');
 $assert(str_contains($layout, 'twitter:description') && str_contains($layout, 'application/ld+json'), 'Global social metadata or JSON-LD output is missing.');
 $assert(str_contains($sitemap, 'MAX(updated_at)') && str_contains($sitemap, '<lastmod>'), 'Guide sitemap must expose accurate last-modified dates.');
