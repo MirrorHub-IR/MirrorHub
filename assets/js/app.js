@@ -13,6 +13,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const CloseBtn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
+    // Re-submit confirmed forms without dropping the clicked submit button's name/value.
+    const resubmitConfirmedForm = (form, submitter) => {
+        if (typeof form.requestSubmit === 'function') {
+            if (submitter && submitter.form === form && ['submit', 'image'].includes(submitter.type)) {
+                form.requestSubmit(submitter);
+            } else {
+                form.requestSubmit();
+            }
+            return;
+        }
+
+        // Older-browser fallback: include the submitter as a hidden successful control.
+        if (submitter && submitter.form === form && submitter.name) {
+            const hiddenSubmitter = document.createElement('input');
+            hiddenSubmitter.type = 'hidden';
+            hiddenSubmitter.name = submitter.name;
+            hiddenSubmitter.value = submitter.value;
+            form.appendChild(hiddenSubmitter);
+        }
+        form.submit();
+    };
+
     /* ============================================================
        Modal System
        ============================================================ */
@@ -163,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
        ============================================================ */
     document.querySelectorAll('form[data-confirm]').forEach(form => {
         form.addEventListener('submit', async (e) => {
+            const submitter = e.submitter;
             if (form.dataset.confirmed === '1') return;
             e.preventDefault();
             const message = form.dataset.confirm || 'آیا از حذف مطمئن هستید؟';
@@ -175,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (confirmed) {
                 form.dataset.confirmed = '1';
-                form.submit();
+                resubmitConfirmedForm(form, submitter);
             }
         });
     });
@@ -183,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Fallback: legacy onsubmit confirm */
     document.querySelectorAll('form[onsubmit]').forEach(form => {
         form.addEventListener('submit', async (e) => {
+            const submitter = e.submitter;
             if (form.dataset.confirmed === '1') return;
             e.preventDefault();
             const message = form.dataset.confirm || 'آیا از انجام این عملیات مطمئن هستید؟';
@@ -194,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (confirmed) {
                 form.dataset.confirmed = '1';
-                form.submit();
+                resubmitConfirmedForm(form, submitter);
             }
         });
         form.removeAttribute('onsubmit');
