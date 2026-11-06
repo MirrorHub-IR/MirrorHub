@@ -54,6 +54,9 @@ $assert(str_contains($setup, 'session_regenerate_id(true)'), 'Setup must regener
 $assert(str_contains($setup, '@unlink(__FILE__)'), 'Setup should remove its public installer after success.');
 $assert(str_contains($donate, 'function ensureDonateSchema'), 'Donate settings schema helper is missing.');
 $assert(str_contains($donate, 'function donateValidateUrl'), 'Donate URL validation helper is missing.');
+$assert(str_contains($donate, "'bale_url' => ''"), 'Donate settings must include the configurable Bale URL.');
+$assert(str_contains($donateAdmin, "'bale_url' => 'لینک بله'"), 'Donate admin must validate the Bale URL.');
+$assert(str_contains($donatePage, "$settings['bale_url']") && str_contains($donatePage, "donate-channel-bale"), 'Public Donate page must render the configured Bale contact card.');
 $assert(str_contains($donateAdmin, 'verifyCsrfToken') && str_contains($donateAdmin, 'generateCsrfToken'), 'Donate settings must use CSRF protection.');
 $assert(str_contains($donateAdmin, 'donateSaveSettings'), 'Donate settings must be persisted.');
 $assert(str_contains($donatePage, 'htmlspecialchars') && str_contains($donatePage, 'rel="noopener noreferrer"'), 'Public contact links must be escaped and opened safely.');
@@ -117,9 +120,11 @@ require_once $root . '/includes/cms.php';
 require_once $root . '/includes/monitoring.php';
 require_once $root . '/includes/donate.php';
 $assert(donateValidateUrl('https://t.me/mirrorhub'), 'Valid HTTPS Telegram links should be accepted.');
+$assert(donateValidateUrl('https://ble.ir/mirrorhub'), 'Valid HTTPS Bale links should be accepted.');
 $assert(donateValidateUrl('mailto:hello@example.com'), 'Valid mailto contact links should be accepted.');
 $assert(!donateValidateUrl('javascript:alert(1)'), 'JavaScript URLs must be rejected for Donate links.');
 $assert(!donateValidateUrl('http://example.com'), 'Plain HTTP links must be rejected for Donate links.');
+$assert(!donateValidateUrl('javascript:alert(1)'), 'Unsafe schemes must also be rejected for the Bale URL.');
 $assert(!donateValidateUrl('https://user:pass@example.com'), 'Credential-bearing URLs must be rejected for Donate links.');
 
 
