@@ -106,7 +106,7 @@ renderHeader('تنظیمات صفحهٔ Donate', true);
         <section class="admin-donate-panel">
             <div class="admin-donate-panel-heading">
                 <span class="admin-donate-panel-icon telegram"><?= icon('users', 19) ?></span>
-                <div><h2>راه‌های ارتباطی اصلی</h2><p>لینک تلگرام، بله و GitHub در صفحهٔ عمومی نمایش داده می‌شوند؛ آدرس بله را در این بخش وارد کنید.</p></div>
+                <div><h2>راه‌های ارتباطی اصلی</h2><p>لینک‌های تلگرام، بله و GitHub در صورت تنظیم آدرس در صفحهٔ عمومی نمایش داده می‌شوند؛ آدرس بله را در این بخش وارد کنید.</p></div>
             </div>
             <div class="editor-grid">
                 <div class="form-group">
