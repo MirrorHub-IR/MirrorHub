@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['donate_action'] ?? '') ===
         else $values[$key] = $value;
     }
 
-    foreach (['telegram_url' => 'لینک تلگرام', 'github_url' => 'لینک GitHub'] as $key => $label) {
+    foreach (['telegram_url' => 'لینک تلگرام', 'bale_url' => 'لینک بله', 'github_url' => 'لینک GitHub'] as $key => $label) {
         $url = trim((string)($_POST[$key] ?? ''));
         if (!donateValidateUrl($url)) $errors[] = $label . ' باید یک آدرس HTTPS معتبر باشد.';
         else $values[$key] = $url;
@@ -74,7 +74,7 @@ renderHeader('تنظیمات صفحهٔ Donate', true);
         <div>
             <span class="admin-donate-eyebrow"><?= icon('heart', 15) ?> ارتباط با جامعه</span>
             <h1>صفحهٔ Donate</h1>
-            <p>متن صفحهٔ عمومی و راه‌های ارتباطی MirrorHub را از یک جا مدیریت کنید. لینک‌های تلگرام و GitHub همیشه در دسترس‌اند و چهار کانال دلخواه هم می‌توانید اضافه کنید.</p>
+            <p>متن صفحهٔ عمومی و راه‌های ارتباطی MirrorHub را از یک جا مدیریت کنید. لینک‌های تلگرام، بله و GitHub را تنظیم کنید؛ چهار کانال دلخواه دیگر هم قابل اضافه‌کردن است.</p>
         </div>
         <a class="btn btn-outline" href="<?= SITE_URL ?>/donate.php" target="_blank" rel="noopener noreferrer"><?= icon('activity', 15) ?> مشاهدهٔ صفحهٔ عمومی</a>
     </section>
@@ -106,13 +106,18 @@ renderHeader('تنظیمات صفحهٔ Donate', true);
         <section class="admin-donate-panel">
             <div class="admin-donate-panel-heading">
                 <span class="admin-donate-panel-icon telegram"><?= icon('users', 19) ?></span>
-                <div><h2>راه‌های ارتباطی اصلی</h2><p>تلگرام و GitHub به‌صورت پیش‌فرض در صفحهٔ Donate پشتیبانی می‌شوند.</p></div>
+                <div><h2>راه‌های ارتباطی اصلی</h2><p>لینک تلگرام، بله و GitHub در صفحهٔ عمومی نمایش داده می‌شوند؛ آدرس بله را در این بخش وارد کنید.</p></div>
             </div>
             <div class="editor-grid">
                 <div class="form-group">
                     <label for="telegram_url">لینک تلگرام</label>
                     <input type="url" id="telegram_url" name="telegram_url" dir="ltr" maxlength="500" value="<?= $h($settings['telegram_url']) ?>" placeholder="https://t.me/your_channel">
                     <span class="form-hint">کانال، گروه یا آیدی عمومی تلگرام؛ لینک را با https:// وارد کنید.</span>
+                </div>
+                <div class="form-group">
+                    <label for="bale_url">لینک بله</label>
+                    <input type="url" id="bale_url" name="bale_url" dir="ltr" maxlength="500" value="<?= $h($settings['bale_url']) ?>" placeholder="https://ble.ir/your_channel">
+                    <span class="form-hint">لینک عمومی کانال یا صفحهٔ MirrorHub در بله؛ با https:// وارد کنید.</span>
                 </div>
                 <div class="form-group">
                     <label for="github_url">لینک GitHub</label>
