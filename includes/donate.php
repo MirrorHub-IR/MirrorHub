@@ -8,6 +8,7 @@ function donateDefaults(): array {
         'page_subtitle' => 'MirrorHub یک پروژهٔ مستقل برای پیدا کردن و پایش میرورهای نرم‌افزاری است.',
         'page_intro' => 'ساختن و نگهداری یک فهرست قابل‌اعتماد از میرورها به زمان، زیرساخت و همراهی جامعه نیاز دارد. اگر این پروژه برایتان مفید است، آن را به دیگران معرفی کنید، در توسعه‌اش مشارکت کنید یا از راه‌های ارتباطی با ما در تماس باشید.',
         'telegram_url' => '',
+        'bale_url' => '',
         'github_url' => '',
         'channel_1_name' => '', 'channel_1_url' => '', 'channel_1_description' => '',
         'channel_2_name' => '', 'channel_2_url' => '', 'channel_2_description' => '',
