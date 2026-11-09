@@ -787,3 +787,69 @@
 @media (prefers-reduced-motion: reduce) {
     .admin-monitor-page *, .admin-monitor-page *::before, .admin-monitor-page *::after { transition:none !important; animation:none !important; }
 }
+
+
+/* Unified file upload surfaces: native keyboard focus, drop target and clipboard feedback. */
+.admin-layout .mh-upload-zone {
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px dashed var(--admin-border-strong);
+    border-radius: 14px;
+    background: rgba(255,255,255,.018);
+    transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.admin-layout .mh-upload-zone:focus-visible {
+    outline: 2px solid var(--admin-accent);
+    outline-offset: 3px;
+}
+.admin-layout .mh-upload-zone.is-dragging {
+    border-color: var(--admin-accent);
+    background: rgba(169,217,108,.09);
+    box-shadow: inset 0 0 0 1px rgba(169,217,108,.16);
+}
+.admin-layout .mh-file-upload-zone {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding: 18px;
+    cursor: pointer;
+}
+.admin-layout .mh-file-upload-zone input[type="file"] {
+    width: 100%;
+    min-width: 0;
+    cursor: pointer;
+}
+.admin-layout .mh-file-upload-prompt {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    color: #dce9dd;
+    text-align: center;
+    line-height: 1.8;
+}
+.admin-layout .mh-file-upload-prompt svg { color: var(--admin-accent); }
+.admin-layout .mh-file-upload-prompt small,
+.admin-layout .mh-upload-instructions {
+    color: var(--admin-muted);
+    font-size: .72rem;
+    line-height: 1.9;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+.admin-layout .category-icon-current {
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:12px;
+    padding:12px;
+    border:1px solid var(--admin-border);
+    border-radius:12px;
+    background:rgba(255,255,255,.02);
+}
+.admin-layout .category-icon-current img { width:56px; height:56px; object-fit:contain; }
+@media(max-width:620px) {
+    .admin-layout .mh-file-upload-zone { padding:13px; }
+    .admin-layout .mh-file-upload-zone input[type="file"] { font-size:.75rem; }
+}
