@@ -80,9 +80,19 @@ $assert(str_contains($setup, 'mb_strlen($adminPassword, \'UTF-8\') < 12'), 'Inst
 $assert(str_contains($setup, 'request_links'), 'Fresh installations must create request_links.');
 $functions = file_get_contents($root . '/includes/functions.php') ?: '';
 $categoryAdmin = file_get_contents($root . '/admin/categories.php') ?: '';
-$assert(!str_contains($functions, 'image/svg+xml'), 'Category icon upload must not accept SVG.');
-$assert(str_contains($functions, 'getimagesize'), 'Uploaded category icons must be checked as actual raster images.');
-$assert(str_contains($categoryAdmin, 'image/webp'), 'Category icon form must advertise WebP uploads.');
+$categoryFunctions = file_get_contents($root . '/includes/functions.php') ?: '';
+$categoryPublic = file_get_contents($root . '/category.php') ?: '';
+$contributePage = file_get_contents($root . '/contribute.php') ?: '';
+$assert(str_contains($categoryFunctions, 'function sanitizeCategorySvg'), 'Safe SVG sanitizer is missing.');
+$assert(str_contains($categoryFunctions, 'function ensureCategoryBaseUrlSchema'), 'Category base URL migration helper is missing.');
+$assert(str_contains($categoryFunctions, 'function categoryBaseUrlIsValid'), 'Category base URL validation helper is missing.');
+$assert(str_contains($categoryFunctions, 'getimagesize'), 'Uploaded raster category icons must be checked as actual images.');
+$assert(str_contains($categoryAdmin, 'image/svg+xml') && str_contains($categoryAdmin, 'name="base_url"'), 'Category editor must accept SVG icons and expose a base URL.');
+$assert(str_contains($categoryAdmin, 'delete-category-icon-form'), 'Category icon removal form must be separate from the edit form.');
+$assert(!str_contains($categoryAdmin, '<form action="<?= SITE_URL ?>/admin/categories.php?id=<?= $id ?>" method="POST" style="display: inline-block;'), 'Category editor must not contain nested forms.');
+$assert(str_contains($categoryPublic, "$category['base_url']"), 'Public category page must display the configured base URL.');
+$assert(str_contains($categoryFunctions, "'code-2' =>"), 'Development SVG icon must exist in the icon registry.');
+$assert(str_contains($contributePage, "icon('code-2', 24)"), 'Project development contribution card must display its icon.');
 $assert(str_contains($ignore, '/config.local.php'), 'Local config must be git-ignored.');
 $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct access to the local config file.');
 
@@ -126,6 +136,18 @@ $assert(!donateValidateUrl('javascript:alert(1)'), 'JavaScript URLs must be reje
 $assert(!donateValidateUrl('http://example.com'), 'Plain HTTP links must be rejected for Donate links.');
 $assert(!donateValidateUrl('javascript:alert(1)'), 'Unsafe schemes must also be rejected for the Bale URL.');
 $assert(!donateValidateUrl('https://user:pass@example.com'), 'Credential-bearing URLs must be rejected for Donate links.');
+if (class_exists(DOMDocument::class)) {
+    $unsafeSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" onload="alert(1)"><script>alert(1)</script><path d="M1 1h2" fill="url(https://evil.example/a.svg)"/><circle cx="5" cy="5" r="2"/></svg>';
+    $safeSvg = sanitizeCategorySvg($unsafeSvg);
+    $assert(is_string($safeSvg) && !str_contains($safeSvg, '<script') && !str_contains($safeSvg, 'onload=') && !str_contains($safeSvg, 'https://evil.example'), 'SVG upload sanitizer must remove active and external content.');
+    $assert(sanitizeCategorySvg('<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg>&x;</svg>') === false, 'SVG upload sanitizer must reject DTD/entity input.');
+}
+$assert(categoryBaseUrlIsValid('https://mirror.example.org/repo'), 'HTTPS category base URLs must be accepted.');
+$assert(categoryBaseUrlIsValid('http://mirror.example.org/repo'), 'HTTP category base URLs must be accepted.');
+$assert(categoryBaseUrlIsValid(''), 'Category base URL may be empty.');
+$assert(!categoryBaseUrlIsValid('ftp://mirror.example.org/repo'), 'Category base URLs must only allow HTTP or HTTPS.');
+$assert(!categoryBaseUrlIsValid('https://user:pass@mirror.example.org'), 'Category base URLs must reject embedded credentials.');
+
 
 
 $badPath = monitorNormalizeRepositoryPath('custom', '../private');
