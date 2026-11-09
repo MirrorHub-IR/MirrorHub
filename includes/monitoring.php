@@ -1065,11 +1065,12 @@ function monitorStatusSummary(PDO $pdo): array {
                     AVG(CASE WHEN mc.status IN ('up','slow') AND mc.response_ms IS NOT NULL THEN mc.response_ms END) AS avg_ms
                 FROM mirror_checks mc
                 INNER JOIN mirrors m ON m.id = mc.mirror_id
-                INNER JOIN mirror_categories mcat ON mcat.mirror_id = m.id
-                INNER JOIN categories c ON c.id = mcat.category_id AND c.type = 'provider'
                 WHERE mc.checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                   AND m.status = 'active'
-                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')")->fetch();
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+                  AND EXISTS (SELECT 1 FROM mirror_categories mcat
+                      INNER JOIN categories c ON c.id = mcat.category_id AND c.type = 'provider'
+                      WHERE mcat.mirror_id = m.id)")->fetch();
         if ($agg && (int)$agg['total'] > 0) {
             $out['uptime_percent'] = round((int)$agg['ok'] * 100 / (int)$agg['total'], 2);
             $out['avg_response_ms'] = $agg['avg_ms'] !== null ? (int)round((float)$agg['avg_ms']) : null;
