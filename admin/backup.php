@@ -3,6 +3,7 @@ require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
+ensureCategoryBaseUrlSchema($pdo);
 
 require_once __DIR__ . '/../includes/donate.php';
 ensureDonateSchema($pdo);
@@ -119,7 +120,12 @@ function backupCollectUploadFiles(): array {
         $real = realpath($absolute);
         if ($real === false || !str_starts_with($real, $rootReal . DIRECTORY_SEPARATOR)) continue;
         $relative = substr(str_replace('\\\\', '/', $real), strlen(str_replace('\\\\', '/', $rootReal)) + 1);
-        $relative = backupNormalizeUploadPath($relative);
+        try {
+            $relative = backupNormalizeUploadPath($relative);
+        } catch (RuntimeException $unsafePath) {
+            // Skip files that cannot safely be restored (for example server-side scripts).
+            continue;
+        }
         $size = (int)$item->getSize();
         if ($size < 0 || $size > $maxFileBytes || $totalBytes + $size > $maxTotalBytes) {
             throw new RuntimeException('حجم فایل‌های آپلودی بیش از سقف مجاز پشتیبان‌گیری است (هر فایل ۱۰ و مجموع ۶۴ مگابایت).');
