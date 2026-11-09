@@ -306,6 +306,7 @@ if ($posted && $action === 'install') {
                 `name` VARCHAR(100) NOT NULL,
                 `slug` VARCHAR(100) NOT NULL UNIQUE,
                 `description` TEXT,
+                `base_url` VARCHAR(1000) DEFAULT NULL,
                 `parent_id` INT DEFAULT NULL,
                 `type` ENUM('software', 'provider') NOT NULL,
                 `icon` VARCHAR(255) DEFAULT NULL,
