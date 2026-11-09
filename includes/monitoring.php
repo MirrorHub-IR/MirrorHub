@@ -632,6 +632,7 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
             LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
             LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
             WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
             GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at, rh.profile, rh.metadata_path, rh.max_age_hours
             ORDER BY COALESCE(ms.last_checked_at, '1970-01-01 00:00:00') ASC, m.id ASC LIMIT $limit");
         $mirrors->execute();
@@ -1050,7 +1051,9 @@ function monitorStatusSummary(PDO $pdo): array {
             INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
             LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
-            WHERE m.status = 'active' GROUP BY COALESCE(ms.status, 'unknown')");
+            WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+            GROUP BY COALESCE(ms.status, 'unknown')");
         foreach ($stmt as $row) {
             $key = in_array($row['status'], ['up', 'slow', 'down'], true) ? $row['status'] : 'unknown';
             $out[$key] = (int)$row['c'];
@@ -1091,6 +1094,13 @@ function monitorStatusSummary(PDO $pdo): array {
     return $out;
 }
 
+
+/** Return the actual URL scheme for monitoring filters; protocol metadata is not authoritative. */
+function monitorUrlScheme(string $url): string {
+    $scheme = strtolower((string)parse_url(trim($url), PHP_URL_SCHEME));
+    return in_array($scheme, ['http', 'https'], true) ? $scheme : '';
+}
+
 /** وضعیت لحظه‌ای همهٔ میرورهای فعال (برای صفحهٔ وضعیت) */
 function monitorMirrorRows(PDO $pdo): array {
     try {
@@ -1111,6 +1121,7 @@ function monitorMirrorRows(PDO $pdo): array {
                 LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
                 LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
                 WHERE m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
                 GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url,
                     ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
                     ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total,
