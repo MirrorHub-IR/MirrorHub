@@ -38,6 +38,11 @@ $softwareDirectory = file_get_contents($root . '/categories.php') ?: '';
 $providerDirectory = file_get_contents($root . '/providers.php') ?: '';
 $contributePage = file_get_contents($root . '/contribute.php') ?: '';
 $siteJs = file_get_contents($root . '/assets/js/site.js') ?: '';
+$monitorAdmin = file_get_contents($root . '/admin/monitor.php') ?: '';
+$backupAdmin = file_get_contents($root . '/admin/backup.php') ?: '';
+$adminStyles = file_get_contents($root . '/assets/css/admin.css') ?: '';
+$adminHelp = file_get_contents($root . '/admin/help.php') ?: '';
+$adminGuide = file_get_contents($root . '/docs/admin-guide.md') ?: '';
 $appJs = file_get_contents($root . '/assets/js/app.js') ?: '';
 
 $assert(is_file($root . '/setup.php'), 'New browser setup wizard is missing.');
@@ -61,7 +66,7 @@ $assert(str_contains($donateAdmin, 'verifyCsrfToken') && str_contains($donateAdm
 $assert(str_contains($donateAdmin, 'donateSaveSettings'), 'Donate settings must be persisted.');
 $assert(str_contains($donatePage, 'htmlspecialchars') && str_contains($donatePage, 'rel="noopener noreferrer"'), 'Public contact links must be escaped and opened safely.');
 $assert(str_contains($layout, '/admin/donate.php') && str_contains($layout, '/donate.php'), 'Donate links must be present in admin and public navigation.');
-$assert(str_contains($backup, 'donate_settings') && str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 4'), 'Donate settings must be included in backups.');
+$assert(str_contains($backup, 'donate_settings') && str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 5'), 'Donate settings must be included in backups.');
 
 $assert(str_contains($htaccess, '.mirrorhub-installed'), 'Apache must deny direct reads of the installation lock.');
 $assert(str_contains($config, 'MIRRORHUB_DB_PORT'), 'Database port must be configurable through the environment.');
@@ -99,7 +104,7 @@ $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct 
 foreach (['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'] as $table) {
     $assert(str_contains($backup, "'" . $table . "'"), 'Backup coverage missing table: ' . $table);
 }
-$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 4'), 'Backup format version must match the Donate settings migration.');
+$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 5'), 'Backup format version must match the Donate settings migration.');
 $assert(str_contains($backup, 'legacyMissingTables'), 'Legacy backup safety guard is missing.');
 $assert(str_contains($monitoring, 'mirror_repository_health'), 'Repository-health schema is missing.');
 $assert(str_contains($repoHealth, 'function monitorEvaluateRepositoryHealth'), 'Repository-health evaluator is missing.');
@@ -129,6 +134,9 @@ require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
 require_once $root . '/includes/monitoring.php';
 require_once $root . '/includes/donate.php';
+$assert(monitorUrlScheme('https://mirror.example/repo') === 'https', 'Monitor URL scheme must detect HTTPS from the URL.');
+$assert(monitorUrlScheme('http://mirror.example/repo') === 'http', 'Monitor URL scheme must detect HTTP from the URL.');
+$assert(monitorUrlScheme('ftp://mirror.example/repo') === '', 'Monitor URL scheme must exclude non-HTTP protocols.');
 $assert(donateValidateUrl('https://t.me/mirrorhub'), 'Valid HTTPS Telegram links should be accepted.');
 $assert(donateValidateUrl('https://ble.ir/mirrorhub'), 'Valid HTTPS Bale links should be accepted.');
 $assert(donateValidateUrl('mailto:hello@example.com'), 'Valid mailto contact links should be accepted.');
@@ -202,6 +210,15 @@ $assert(str_contains($contributePage, '/suggest.php') && str_contains($contribut
 $assert(str_contains($homePage, 'home-explore-grid') && str_contains($homePage, 'home-search'), 'Homepage discovery layout is missing.');
 $assert(str_contains($siteJs, "event.key === 'Escape'") && str_contains($siteJs, "aria-expanded"), 'Responsive navigation must support Escape and expose its expanded state.');
 $assert(str_contains($sitemap, "baseUrl . '/mirrors/'") && str_contains($sitemap, "baseUrl . '/providers/'"), 'Sitemap must include the new directory landing pages.');
+$assert(str_contains($backupAdmin, 'backupCollectUploadFiles') && str_contains($backupAdmin, "'files' => backupCollectUploadFiles()"), 'Backup export must include the uploads manifest.');
+$assert(str_contains($backupAdmin, 'backupValidateUploadFiles') && str_contains($backupAdmin, 'backupRestoreUploadFiles'), 'Backup import must validate and restore uploaded files.');
+$assert(str_contains($backupAdmin, 'backupNormalizeUploadPath') && str_contains($backupAdmin, 'content_base64') && str_contains($backupAdmin, 'sha256'), 'Uploaded-file archives must validate safe relative paths and integrity hashes.');
+$assert(str_contains($siteJs, "document.addEventListener('paste'") && str_contains($siteJs, 'DataTransfer') && str_contains($siteJs, 'is-dragging'), 'Global upload areas must support clipboard paste, drag/drop and selected-file updates.');
+$assert(str_contains($monitorAdmin, 'name="scheme"') && str_contains($monitorAdmin, 'mon-card-grid') && str_contains($monitorAdmin, 'monitorUrlScheme'), 'Admin monitor page must provide URL-scheme filtering and responsive cards.');
+$assert(str_contains($monitoring, "LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%'") && str_contains($monitoring, 'function monitorUrlScheme'), 'Monitoring cycle and summaries must only include HTTP/HTTPS URLs.');
+$assert(str_contains($adminStyles, '.admin-sidebar { overflow-x: hidden; }') && str_contains($adminStyles, '.admin-nav { overflow-x: hidden;'), 'Admin sidebar must not expose horizontal overflow.');
+$assert(str_contains($adminHelp, 'Base URL') && str_contains($adminHelp, 'Ctrl+V') && str_contains($adminHelp, 'SVG'), 'In-panel admin guide must explain category base URLs, SVG and file paste.');
+$assert(str_contains($adminGuide, 'Base URL') && str_contains($adminGuide, 'فایل‌های آپلودی') && str_contains($adminGuide, 'HTTPS'), 'Persian admin guide must document the new category, monitor and backup behavior.');
 
 if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
     $cmsTestPdo = new PDO('sqlite::memory:');
