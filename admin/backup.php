@@ -602,7 +602,7 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
                     <div>
                         <div class="import-zone-icon"><?= icon('inbox', 25) ?></div>
                         <strong>فایل JSON را اینجا رها کنید</strong>
-                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۲۵ مگابایت</span>
+                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت</span>
                     </div>
                 </label>
 
