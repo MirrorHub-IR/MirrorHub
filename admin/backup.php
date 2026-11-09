@@ -88,7 +88,7 @@ function backupNormalizeUploadPath(string $path): string {
         }
     }
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    if (in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess'], true)) {
+    if (in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
         throw new RuntimeException('بازیابی فایل اجرایی از مسیر آپلود مجاز نیست.');
     }
     return implode('/', $parts);
@@ -100,7 +100,7 @@ function backupNormalizeUploadPath(string $path): string {
  */
 function backupCollectUploadFiles(): array {
     $root = dirname(__DIR__) . '/uploads';
-    if (!is_dir($root)) return [];
+    if (is_link($root) || !is_dir($root)) return [];
     $rootReal = realpath($root);
     if ($rootReal === false) return [];
 
@@ -172,6 +172,11 @@ function backupValidateUploadFiles($entries): array {
         }
         $totalBytes += $size;
         if ($totalBytes > 64 * 1024 * 1024) throw new RuntimeException('حجم مجموع فایل‌های آپلودی بیش از ۶۴ مگابایت است.');
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            $safeSvg = function_exists('sanitizeCategorySvg') ? sanitizeCategorySvg($content) : false;
+            if ($safeSvg === false) throw new RuntimeException('فایل SVG در پشتیبان ناامن یا نامعتبر است.');
+            $content = $safeSvg;
+        }
         $decoded[$path] = $content;
     }
     return $decoded;
@@ -181,6 +186,7 @@ function backupValidateUploadFiles($entries): array {
 function backupRestoreUploadFiles(array $files): int {
     if (!$files) return 0;
     $root = dirname(__DIR__) . '/uploads';
+    if (is_link($root)) throw new RuntimeException('پوشهٔ uploads نباید symbolic link باشد.');
     if (!is_dir($root) && !mkdir($root, 0755, true) && !is_dir($root)) {
         throw new RuntimeException('ساخت پوشهٔ uploads برای بازیابی فایل‌ها ناموفق بود.');
     }
@@ -229,13 +235,19 @@ function mappedId(array $map, $oldId, string $label): ?int {
 }
 
 if (($_GET['action'] ?? '') === 'export') {
+    try {
+        $uploadArchive = backupCollectUploadFiles();
+    } catch (Throwable $uploadError) {
+        flash('error', 'ساخت پشتیبان فایل‌های آپلودی ناموفق بود: ' . $uploadError->getMessage());
+        redirect(SITE_URL . '/admin/backup.php');
+    }
     $payload = [
         'format' => 'mirrorhub-backup',
         'version' => MIRRORHUB_BACKUP_VERSION,
         'exported_at' => date('c'),
         'site' => SITE_NAME,
         'tables' => [],
-        'files' => backupCollectUploadFiles(),
+        'files' => $uploadArchive,
     ];
 
     // Use a consistent snapshot so related tables are not exported from different points in time.
