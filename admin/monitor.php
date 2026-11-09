@@ -203,89 +203,84 @@ renderHeader('پایش سرورها', true);
 </section>
 
 <section class="section admin-monitor-table-section">
-    <h2 class="section-title">وضعیت میرورها</h2>
+    <div class="section-header">
+        <h2 class="section-title">وضعیت میرورها</h2>
+        <span class="badge badge-default"><?= monitorFa(count($rows)) ?> مورد در این فیلتر</span>
+    </div>
+
+    <form method="get" action="<?= SITE_URL ?>/admin/monitor.php" class="mon-filter-bar">
+        <div>
+            <strong>پالایش بر اساس پروتکل URL</strong>
+            <small>فقط HTTP و HTTPS پایش می‌شوند؛ مقدار پروتکل ثبت‌شده در میرور صرفاً متادیتاست.</small>
+        </div>
+        <label for="monitor-scheme-filter">پروتکل نشانی</label>
+        <select id="monitor-scheme-filter" name="scheme">
+            <option value="all" <?= $schemeFilter === 'all' ? 'selected' : '' ?>>همهٔ HTTP/HTTPS (<?= monitorFa($schemeCounts['http'] + $schemeCounts['https']) ?>)</option>
+            <option value="https" <?= $schemeFilter === 'https' ? 'selected' : '' ?>>HTTPS (<?= monitorFa($schemeCounts['https']) ?>)</option>
+            <option value="http" <?= $schemeFilter === 'http' ? 'selected' : '' ?>>HTTP (<?= monitorFa($schemeCounts['http']) ?>)</option>
+        </select>
+        <button type="submit" class="btn btn-primary"><?= icon('filter', 15) ?> اعمال فیلتر</button>
+        <?php if ($schemeFilter !== 'all'): ?><a href="<?= SITE_URL ?>/admin/monitor.php" class="btn btn-outline">پاک‌کردن فیلتر</a><?php endif; ?>
+    </form>
+
     <?php if (empty($rows)): ?>
-        <p class="empty-state">میروری برای پایش وجود ندارد.</p>
+        <p class="empty-state"><?= $schemeFilter === 'all' ? 'میرور HTTP یا HTTPS واجد شرایطی برای پایش وجود ندارد.' : 'میروری با این پروتکل در فهرست پایش پیدا نشد.' ?></p>
     <?php else: ?>
-
-        <form method="get" action="<?= SITE_URL ?>/admin/monitor.php" class="mon-filter-bar">
-            <div>
-                <strong>پالایش بر اساس پروتکل URL</strong>
-                <small>فقط HTTP و HTTPS؛ مقدار پروتکل در اطلاعات میرور صرفاً متادیتاست.</small>
-            </div>
-            <label for="monitor-scheme-filter">پروتکل نشانی</label>
-            <select id="monitor-scheme-filter" name="scheme">
-                <option value="all" <?= $schemeFilter === 'all' ? 'selected' : '' ?>>همهٔ HTTP/HTTPS (<?= monitorFa($schemeCounts['http'] + $schemeCounts['https']) ?>)</option>
-                <option value="https" <?= $schemeFilter === 'https' ? 'selected' : '' ?>>HTTPS (<?= monitorFa($schemeCounts['https']) ?>)</option>
-                <option value="http" <?= $schemeFilter === 'http' ? 'selected' : '' ?>>HTTP (<?= monitorFa($schemeCounts['http']) ?>)</option>
-            </select>
-            <button type="submit" class="btn btn-primary"><?= icon('filter', 15) ?> اعمال فیلتر</button>
-            <?php if ($schemeFilter !== 'all'): ?><a href="<?= SITE_URL ?>/admin/monitor.php" class="btn btn-outline">پاک‌کردن فیلتر</a><?php endif; ?>
-        </form>
-
-        <?php if (empty($rows)): ?>
-            <p class="empty-state"><?= $schemeFilter === 'all' ? 'میرور HTTP یا HTTPS واجد شرایطی برای پایش وجود ندارد.' : 'میروری با این پروتکل در فهرست پایش پیدا نشد.' ?></p>
-        <?php else: ?>
-            <div class="mon-card-grid">
-                <?php foreach ($rows as $row): ?>
-                    <?php
-                        $names = mirrorDisplayName($row);
-                        $daily = monitorUptimeSeries($pdo, (int)$row['id'], 30);
-                        $latency = monitorLatencySeries($pdo, (int)$row['id'], 30);
-                        $rowScheme = monitorUrlScheme((string)$row['url']);
-                    ?>
-                    <article class="mon-mirror-card mon-card-<?= htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8') ?>">
-                        <header class="mon-card-head">
-                            <div class="mon-card-name">
-                                <strong><?= htmlspecialchars($names['fa'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                <?php if (!empty($names['en']) && $names['en'] !== $names['fa']): ?><small><?= htmlspecialchars($names['en'], ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?>
-                                <a class="mon-url" href="<?= htmlspecialchars($row['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($row['url'], ENT_QUOTES, 'UTF-8') ?></a>
-                            </div>
-                            <span class="mon-scheme-tag mon-scheme-<?= $rowScheme ?>"><?= strtoupper($rowScheme) ?></span>
-                        </header>
-
-                        <div class="mon-card-badges">
-                            <?= monitorStatusBadge($row) ?>
-                            <?= monitorRepositoryHealthBadge($row) ?>
+        <div class="mon-card-grid">
+            <?php foreach ($rows as $row): ?>
+                <?php
+                    $names = mirrorDisplayName($row);
+                    $daily = monitorUptimeSeries($pdo, (int)$row['id'], 30);
+                    $latency = monitorLatencySeries($pdo, (int)$row['id'], 30);
+                    $rowScheme = monitorUrlScheme((string)$row['url']);
+                ?>
+                <article class="mon-mirror-card mon-card-<?= htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8') ?>">
+                    <header class="mon-card-head">
+                        <div class="mon-card-name">
+                            <strong><?= htmlspecialchars($names['fa'], ENT_QUOTES, 'UTF-8') ?></strong>
+                            <?php if (!empty($names['en']) && $names['en'] !== $names['fa']): ?><small><?= htmlspecialchars($names['en'], ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?>
+                            <a class="mon-url" href="<?= htmlspecialchars($row['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($row['url'], ENT_QUOTES, 'UTF-8') ?></a>
                         </div>
-
-                        <?php if (!empty($row['repository_health_checked_at'])): ?>
-                            <p class="mon-card-health-time">آخرین بررسی سلامت محتوا: <?= monitorTimeAgoFa($row['repository_health_checked_at']) ?></p>
-                        <?php endif; ?>
-
-                        <div class="mon-card-metrics">
-                            <div><span>زمان پاسخ</span><strong><?= $row['last_response_ms'] !== null ? monitorFa((int)$row['last_response_ms']) . ' ms' : '—' ?></strong></div>
-                            <div><span>کد HTTP</span><strong><?= $row['last_http_code'] ? monitorFa((int)$row['last_http_code']) : '—' ?></strong></div>
-                            <div><span>آپتایم ۳۰ روز</span><strong><?= $row['uptime_percent'] !== null ? monitorFa(number_format((float)$row['uptime_percent'], 1)) . '٪' : '—' ?></strong></div>
-                            <div><span>آخرین بررسی</span><strong><?= monitorTimeAgoFa($row['last_checked_at']) ?></strong></div>
+                        <span class="mon-scheme-tag mon-scheme-<?= $rowScheme ?>"><?= strtoupper($rowScheme) ?></span>
+                    </header>
+                    <div class="mon-card-badges">
+                        <?= monitorStatusBadge($row) ?>
+                        <?= monitorRepositoryHealthBadge($row) ?>
+                    </div>
+                    <?php if (!empty($row['repository_health_checked_at'])): ?>
+                        <p class="mon-card-health-time">آخرین بررسی سلامت محتوا: <?= monitorTimeAgoFa($row['repository_health_checked_at']) ?></p>
+                    <?php endif; ?>
+                    <div class="mon-card-metrics">
+                        <div><span>زمان پاسخ</span><strong><?= $row['last_response_ms'] !== null ? monitorFa((int)$row['last_response_ms']) . ' ms' : '—' ?></strong></div>
+                        <div><span>کد HTTP</span><strong><?= $row['last_http_code'] ? monitorFa((int)$row['last_http_code']) : '—' ?></strong></div>
+                        <div><span>آپتایم ۳۰ روز</span><strong><?= $row['uptime_percent'] !== null ? monitorFa(number_format((float)$row['uptime_percent'], 1)) . '٪' : '—' ?></strong></div>
+                        <div><span>آخرین بررسی</span><strong><?= monitorTimeAgoFa($row['last_checked_at']) ?></strong></div>
+                    </div>
+                    <div class="mon-card-chart">
+                        <div><span>پایداری روزانه</span><?= monitorUptimeBar($daily, 30) ?></div>
+                        <div><span>روند پاسخ</span><?= $latency ? monitorSparkline($latency) : '<span class="mon-no-data">داده‌ای نیست</span>' ?></div>
+                    </div>
+                    <?php if ($row['status'] === 'down' && !empty($row['last_error'])): ?>
+                        <div class="mon-card-error">
+                            <?= icon('alert-triangle', 14) ?>
+                            <span><?= htmlspecialchars($row['last_error'], ENT_QUOTES, 'UTF-8') ?></span>
+                            <?php if (!empty($row['down_since'])): ?><small>قطعی از <?= monitorFaDateTime($row['down_since']) ?></small><?php endif; ?>
                         </div>
-
-                        <div class="mon-card-chart">
-                            <div><span>پایداری روزانه</span><?= monitorUptimeBar($daily, 30) ?></div>
-                            <div><span>روند پاسخ</span><?= $latency ? monitorSparkline($latency) : '<span class="mon-no-data">داده‌ای نیست</span>' ?></div>
-                        </div>
-
-                        <?php if ($row['status'] === 'down' && !empty($row['last_error'])): ?>
-                            <div class="mon-card-error">
-                                <?= icon('alert-triangle', 14) ?>
-                                <span><?= htmlspecialchars($row['last_error'], ENT_QUOTES, 'UTF-8') ?></span>
-                                <?php if (!empty($row['down_since'])): ?><small>قطعی از <?= monitorFaDateTime($row['down_since']) ?></small><?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <footer class="mon-card-actions">
-                            <span>شناسهٔ میرور: <?= monitorFa((int)$row['id']) ?></span>
-                            <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php" class="inline-form">
-                                <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                <input type="hidden" name="req_action" value="purge_history">
-                                <input type="hidden" name="mirror_id" value="<?= (int)$row['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-outline btn-danger" onclick="return confirm('تاریخچهٔ پایش این میرور پاک شود؟')">پاک‌سازی تاریخچه</button>
-                            </form>
-                        </footer>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+                    <?php endif; ?>
+                    <footer class="mon-card-actions">
+                        <span>شناسهٔ میرور: <?= monitorFa((int)$row['id']) ?></span>
+                        <form method="POST" action="<?= SITE_URL ?>/admin/monitor.php" class="inline-form">
+                            <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="req_action" value="purge_history">
+                            <input type="hidden" name="mirror_id" value="<?= (int)$row['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline btn-danger" onclick="return confirm('تاریخچهٔ پایش این میرور پاک شود؟')">پاک‌سازی تاریخچه</button>
+                        </form>
+                    </footer>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
 
 <section class="section admin-monitor-schedule-section">
     <h2 class="section-title">زمان‌بندی اجرای خودکار</h2>
