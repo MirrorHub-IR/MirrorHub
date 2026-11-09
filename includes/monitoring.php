@@ -1042,10 +1042,11 @@ function monitorStatusSummary(PDO $pdo): array {
     ];
     try {
         $out['mirrors'] = (int)$pdo->query("SELECT COUNT(DISTINCT m.id) FROM mirrors m
-            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
-            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
             WHERE m.status = 'active'
-              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')")->fetchColumn();
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+              AND EXISTS (SELECT 1 FROM mirror_categories mc
+                  INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+                  WHERE mc.mirror_id = m.id)")->fetchColumn();
 
         $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(DISTINCT m.id) AS c
             FROM mirrors m
