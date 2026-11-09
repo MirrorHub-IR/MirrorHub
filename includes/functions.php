@@ -307,74 +307,166 @@ function getCategoryById($pdo, $id) {
     return $stmt->fetch() ?: null;
 }
 
+/**
+ * Sanitize an SVG icon into a static, script-free subset.
+ * External references, event handlers, CSS, scripts and active SVG elements are removed.
+ */
+function sanitizeCategorySvg(string $source): string|false {
+    if ($source === '' || strlen($source) > 500 * 1024 || preg_match('/<!DOCTYPE|<!ENTITY/i', $source)) return false;
+    if (!class_exists(DOMDocument::class)) return false;
+    $previousErrors = libxml_use_internal_errors(true);
+    try {
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $document->resolveExternals = false;
+        $document->substituteEntities = false;
+        $loaded = $document->loadXML($source, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_COMPACT);
+        if (!$loaded || !$document->documentElement) return false;
+        $root = $document->documentElement;
+        if (strtolower((string)$root->localName) !== 'svg') return false;
+        if ($root->namespaceURI && $root->namespaceURI !== 'http://www.w3.org/2000/svg') return false;
+        if (!$root->hasAttribute('xmlns')) $root->setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        $allowedElements = [
+            'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+            'defs', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask',
+            'title', 'desc', 'text', 'tspan',
+        ];
+        $allowedAttributes = [
+            'xmlns', 'id', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'x2', 'y1', 'y2',
+            'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'fill', 'stroke', 'stroke-width',
+            'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset',
+            'stroke-miterlimit', 'opacity', 'fill-opacity', 'stroke-opacity', 'fill-rule',
+            'clip-rule', 'transform', 'preserveAspectRatio', 'gradientUnits', 'gradientTransform',
+            'spreadMethod', 'offset', 'stop-color', 'stop-opacity', 'clipPathUnits',
+            'maskUnits', 'maskContentUnits', 'font-family', 'font-size', 'font-weight',
+            'text-anchor', 'dominant-baseline', 'dx', 'dy', 'role', 'aria-hidden', 'aria-labelledby',
+        ];
+
+        $sanitizeNode = function (DOMElement $element) use (&$sanitizeNode, $allowedElements, $allowedAttributes): void {
+            $tag = (string)$element->localName;
+            if (!in_array($tag, $allowedElements, true)) {
+                $element->parentNode?->removeChild($element);
+                return;
+            }
+            for ($i = $element->attributes->length - 1; $i >= 0; $i--) {
+                $attribute = $element->attributes->item($i);
+                if (!$attribute) continue;
+                $name = (string)$attribute->nodeName;
+                $value = trim((string)$attribute->nodeValue);
+                if (!in_array($name, $allowedAttributes, true) || str_starts_with(strtolower($name), 'on')) {
+                    $element->removeAttributeNode($attribute);
+                    continue;
+                }
+                $activeValue = preg_match('/(?:javascript|data:|https?:|file:|expression\s*\(|@import)/i', $value) === 1;
+                $externalUrl = preg_match('/url\s*\(\s*(?!#[\w:.-]+\s*\))[^)]*\)/i', $value) === 1;
+                if ($activeValue || $externalUrl) $element->removeAttributeNode($attribute);
+            }
+            for ($child = $element->firstChild; $child !== null;) {
+                $next = $child->nextSibling;
+                if ($child instanceof DOMElement) {
+                    $sanitizeNode($child);
+                } elseif ($child->nodeType !== XML_TEXT_NODE && $child->nodeType !== XML_CDATA_SECTION_NODE) {
+                    $element->removeChild($child);
+                }
+                $child = $next;
+            }
+        };
+
+        $sanitizeNode($root);
+        $root->setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        $result = $document->saveXML($root);
+        return is_string($result) && str_contains($result, '<svg') ? $result : false;
+    } catch (Throwable $e) {
+        return false;
+    } finally {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousErrors);
+    }
+}
+
+/** Add the optional category base_url field to installations created before it existed. */
+function ensureCategoryBaseUrlSchema(PDO $pdo): bool {
+    static $done = false;
+    if ($done) return true;
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM categories LIKE 'base_url'")->fetch(PDO::FETCH_ASSOC);
+        if (!$column) $pdo->exec("ALTER TABLE categories ADD COLUMN base_url VARCHAR(1000) DEFAULT NULL AFTER description");
+        $done = true;
+        return true;
+    } catch (Throwable $e) {
+        error_log('MirrorHub category base URL schema migration failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/** A category base URL is optional, but when present it must be an absolute HTTP(S) URL. */
+function categoryBaseUrlIsValid(string $url): bool {
+    $url = trim($url);
+    if ($url === '') return true;
+    if (strlen($url) > 1000 || preg_match('/[\x00-\x20\x7f]/', $url)) return false;
+    $parts = parse_url($url);
+    if (!is_array($parts) || !in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true)) return false;
+    if (empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) return false;
+    return filter_var($url, FILTER_VALIDATE_URL) !== false;
+}
+
 function uploadCategoryIcon($file, $oldIcon = null) {
     $uploadDir = __DIR__ . '/../uploads/category-icons/';
-
     if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
         return ['success' => false, 'error' => 'فایلی آپلود نشده است.'];
     }
-
     if (!isset($file['size']) || (int)$file['size'] <= 0 || (int)$file['size'] > 500 * 1024) {
         return ['success' => false, 'error' => 'حجم فایل باید بیشتر از صفر و حداکثر ۵۰۰ کیلوبایت باشد.'];
     }
 
-    // SVG is intentionally excluded: uploaded vector markup can carry active content.
     $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
-    $allowedMimeByExtension = [
-        'png' => 'image/png',
-        'jpg' => 'image/jpeg',
-        'jpeg' => 'image/jpeg',
-        'webp' => 'image/webp',
-    ];
-    if (!isset($allowedMimeByExtension[$extension])) {
-        return ['success' => false, 'error' => 'فقط فایل‌های PNG، JPG و WebP مجاز هستند.'];
+    $allowedMimeByExtension = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp'];
+    if (!in_array($extension, ['png', 'jpg', 'jpeg', 'webp', 'svg'], true)) {
+        return ['success' => false, 'error' => 'فقط فایل‌های SVG، PNG، JPG و WebP مجاز هستند.'];
     }
-
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    if ($finfo === false) {
-        return ['success' => false, 'error' => 'امکان بررسی نوع فایل وجود ندارد.'];
-    }
-    $mimeType = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-
-    $imageInfo = @getimagesize($file['tmp_name']);
-    $expectedMime = $allowedMimeByExtension[$extension];
-    if ($mimeType !== $expectedMime || $imageInfo === false || ($imageInfo['mime'] ?? '') !== $expectedMime) {
-        return ['success' => false, 'error' => 'محتوای فایل با فرمت اعلام‌شده مطابقت ندارد.'];
-    }
-
-    $canonicalExtension = $expectedMime === 'image/jpeg' ? 'jpg' : $extension;
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
         return ['success' => false, 'error' => 'ساخت پوشهٔ آپلود ناموفق بود.'];
     }
 
+    $canonicalExtension = $extension === 'jpeg' ? 'jpg' : $extension;
     $filename = 'cat_icon_' . bin2hex(random_bytes(16)) . '.' . $canonicalExtension;
     $filepath = $uploadDir . $filename;
 
-    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-        return ['success' => false, 'error' => 'خطا در ذخیره فایل.'];
+    if ($extension === 'svg') {
+        $source = file_get_contents($file['tmp_name']);
+        $safeSvg = is_string($source) ? sanitizeCategorySvg($source) : false;
+        if ($safeSvg === false) {
+            return ['success' => false, 'error' => 'فایل SVG نامعتبر یا دارای محتوای فعال/خارجی است. فقط SVG ایمن و ساده پذیرفته می‌شود.'];
+        }
+        if (file_put_contents($filepath, $safeSvg, LOCK_EX) === false) {
+            return ['success' => false, 'error' => 'ذخیرهٔ فایل SVG ناموفق بود.'];
+        }
+    } else {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) return ['success' => false, 'error' => 'امکان بررسی نوع فایل وجود ندارد.'];
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        $imageInfo = @getimagesize($file['tmp_name']);
+        $expectedMime = $allowedMimeByExtension[$extension] ?? '';
+        if ($mimeType !== $expectedMime || $imageInfo === false || ($imageInfo['mime'] ?? '') !== $expectedMime) {
+            return ['success' => false, 'error' => 'محتوای فایل با فرمت اعلام‌شده مطابقت ندارد.'];
+        }
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            return ['success' => false, 'error' => 'خطا در ذخیره فایل.'];
+        }
     }
-
-    if ($oldIcon && file_exists($uploadDir . basename($oldIcon))) {
-        @unlink($uploadDir . basename($oldIcon));
-    }
-
+    // The caller removes the previous file only after the database update succeeds.
     return ['success' => true, 'filename' => $filename];
 }
 
 function deleteCategoryIcon($icon) {
     if (empty($icon)) return false;
-    
+    $filename = basename((string)$icon);
+    if ($filename !== (string)$icon || !preg_match('/^cat_icon_[a-f0-9]{32}\.(?:svg|png|jpe?g|webp)$/i', $filename)) return false;
     $uploadDir = __DIR__ . '/../uploads/category-icons/';
-    $filepath = $uploadDir . basename($icon);
-    
-    if (file_exists($filepath)) {
-        return @unlink($filepath);
-    }
-    
-    return false;
+    $filepath = $uploadDir . $filename;
+    return is_file($filepath) ? @unlink($filepath) : false;
 }
-
 /* ============================================================
    Mirrors
    ============================================================ */
@@ -712,6 +804,7 @@ function icon($name, $size = 16, $class = '') {
         'heart' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
         'database' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
         'activity' => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+        'code-2' => '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>',
         'layers' => '<path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>',
         'network' => '<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M6 16v-2h12v2M18 14v2"/>',
         'package' => '<path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',

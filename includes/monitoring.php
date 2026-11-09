@@ -632,6 +632,7 @@ function monitorRunCycle(PDO $pdo, array $opts = []): array {
             LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
             LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
             WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
             GROUP BY m.id, m.name_fa, m.name_en, m.url, ms.last_checked_at, rh.profile, rh.metadata_path, rh.max_age_hours
             ORDER BY COALESCE(ms.last_checked_at, '1970-01-01 00:00:00') ASC, m.id ASC LIMIT $limit");
         $mirrors->execute();
@@ -1041,25 +1042,36 @@ function monitorStatusSummary(PDO $pdo): array {
     ];
     try {
         $out['mirrors'] = (int)$pdo->query("SELECT COUNT(DISTINCT m.id) FROM mirrors m
-            INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
-            INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
-            WHERE m.status = 'active'")->fetchColumn();
+            WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+              AND EXISTS (SELECT 1 FROM mirror_categories mc
+                  INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
+                  WHERE mc.mirror_id = m.id)")->fetchColumn();
 
         $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(DISTINCT m.id) AS c
             FROM mirrors m
             INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
             LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
-            WHERE m.status = 'active' GROUP BY COALESCE(ms.status, 'unknown')");
+            WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+            GROUP BY COALESCE(ms.status, 'unknown')");
         foreach ($stmt as $row) {
             $key = in_array($row['status'], ['up', 'slow', 'down'], true) ? $row['status'] : 'unknown';
             $out[$key] = (int)$row['c'];
         }
 
         $agg = $pdo->query("SELECT COUNT(*) AS total,
-                    SUM(status IN ('up','slow')) AS ok,
-                    AVG(CASE WHEN status IN ('up','slow') AND response_ms IS NOT NULL THEN response_ms END) AS avg_ms
-                FROM mirror_checks WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch();
+                    SUM(mc.status IN ('up','slow')) AS ok,
+                    AVG(CASE WHEN mc.status IN ('up','slow') AND mc.response_ms IS NOT NULL THEN mc.response_ms END) AS avg_ms
+                FROM mirror_checks mc
+                INNER JOIN mirrors m ON m.id = mc.mirror_id
+                WHERE mc.checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                  AND m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
+                  AND EXISTS (SELECT 1 FROM mirror_categories mcat
+                      INNER JOIN categories c ON c.id = mcat.category_id AND c.type = 'provider'
+                      WHERE mcat.mirror_id = m.id)")->fetch();
         if ($agg && (int)$agg['total'] > 0) {
             $out['uptime_percent'] = round((int)$agg['ok'] * 100 / (int)$agg['total'], 2);
             $out['avg_response_ms'] = $agg['avg_ms'] !== null ? (int)round((float)$agg['avg_ms']) : null;
@@ -1069,7 +1081,9 @@ function monitorStatusSummary(PDO $pdo): array {
         $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(DISTINCT i.id) FROM mirror_incidents i
             INNER JOIN mirror_categories mc ON mc.mirror_id = i.mirror_id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
-            WHERE i.ended_at IS NULL")->fetchColumn();
+            WHERE i.ended_at IS NULL
+              AND EXISTS (SELECT 1 FROM mirrors m WHERE m.id = i.mirror_id AND m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%'))")->fetchColumn();
 
         $settings = monitorSettings($pdo);
         $out['last_run_at'] = $settings['last_run_at'] ?: null;
@@ -1089,6 +1103,13 @@ function monitorStatusSummary(PDO $pdo): array {
     } catch (Throwable $e) {
     }
     return $out;
+}
+
+
+/** Return the actual URL scheme for monitoring filters; protocol metadata is not authoritative. */
+function monitorUrlScheme(string $url): string {
+    $scheme = strtolower((string)parse_url(trim($url), PHP_URL_SCHEME));
+    return in_array($scheme, ['http', 'https'], true) ? $scheme : '';
 }
 
 /** وضعیت لحظه‌ای همهٔ میرورهای فعال (برای صفحهٔ وضعیت) */
@@ -1111,6 +1132,7 @@ function monitorMirrorRows(PDO $pdo): array {
                 LEFT JOIN mirror_status ms ON ms.mirror_id = m.id
                 LEFT JOIN mirror_repository_health rh ON rh.mirror_id = m.id
                 WHERE m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')
                 GROUP BY m.id, m.name_fa, m.name_en, m.slug, m.url,
                     ms.status, ms.last_checked_at, ms.last_response_ms, ms.last_http_code, ms.last_error,
                     ms.down_since, ms.consecutive_failures, ms.uptime_percent, ms.avg_response_ms, ms.checks_total,

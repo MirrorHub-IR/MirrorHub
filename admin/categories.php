@@ -4,8 +4,10 @@ require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
 
-$action = $_GET['action'] ?? 'list';
-$id = (int)($_GET['id'] ?? 0);
+ensureCategoryBaseUrlSchema($pdo);
+$action = (string)($_POST['category_action'] ?? $_GET['action'] ?? 'list');
+if (!in_array($action, ['list', 'add', 'edit'], true)) $action = 'list';
+$id = max(0, (int)($_POST['category_id'] ?? $_GET['id'] ?? 0));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST[CSRF_TOKEN_NAME] ?? '')) {
@@ -34,12 +36,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(SITE_URL . '/admin/categories.php?action=edit&id=' . $id);
     }
 
-    $name = sanitize($_POST['name'] ?? '');
-    $slug = sanitize($_POST['slug'] ?? '');
-    $description = sanitize($_POST['description'] ?? '');
-    $type = sanitize($_POST['type'] ?? '');
+    $name = trim((string)($_POST['name'] ?? ''));
+    $slug = trim((string)($_POST['slug'] ?? ''));
+    $description = trim((string)($_POST['description'] ?? ''));
+    $baseUrl = trim((string)($_POST['base_url'] ?? ''));
+    $currentForSave = ($action === 'edit' && $id > 0) ? getCategoryById($pdo, $id) : null;
+    $type = $action === 'edit' ? (string)($currentForSave['type'] ?? '') : trim((string)($_POST['type'] ?? ''));
     $parent_id = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     $sort_order = (int)($_POST['sort_order'] ?? 0);
+
+    if ($action === 'edit' && !$currentForSave) {
+        flash('error', 'دسته‌بندی موردنظر برای ویرایش پیدا نشد.');
+        redirect(SITE_URL . '/admin/categories.php');
+    }
+    if (!categoryBaseUrlIsValid($baseUrl)) {
+        flash('error', 'نشانی پایه باید یک URL معتبر با پروتکل http یا https باشد.');
+        redirect(SITE_URL . '/admin/categories.php?action=' . ($id ? "edit&id=$id" : 'add'));
+    }
+    if ($parent_id !== null) {
+        $parentQuery = $pdo->prepare('SELECT id, type FROM categories WHERE id = ?');
+        $parentQuery->execute([$parent_id]);
+        $parentRow = $parentQuery->fetch(PDO::FETCH_ASSOC);
+        if (!$parentRow || $parent_id === $id || $parentRow['type'] !== $type) {
+            flash('error', 'دستهٔ والد باید موجود، هم‌نوع و متفاوت از دستهٔ فعلی باشد.');
+            redirect(SITE_URL . '/admin/categories.php?action=' . ($id ? "edit&id=$id" : 'add'));
+        }
+    }
 
     if (empty($name)) {
         flash('error', 'نام دسته‌بندی الزامی است.');
@@ -74,18 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($action === 'edit' && $id) {
             // Update without changing type (immutable)
-            if ($iconFilename) {
-                $stmt = $pdo->prepare("UPDATE categories SET name=?, slug=?, description=?, parent_id=?, sort_order=?, icon=? WHERE id=?");
-                $stmt->execute([$name, $slug, $description, $parent_id, $sort_order, $iconFilename, $id]);
-            } else {
-                $stmt = $pdo->prepare("UPDATE categories SET name=?, slug=?, description=?, parent_id=?, sort_order=? WHERE id=?");
-                $stmt->execute([$name, $slug, $description, $parent_id, $sort_order, $id]);
-            }
+            $stmt = $pdo->prepare("UPDATE categories SET name=?, slug=?, description=?, base_url=?, parent_id=?, sort_order=?, icon=COALESCE(?, icon) WHERE id=?");
+            $stmt->execute([$name, $slug, $description, $baseUrl !== '' ? $baseUrl : null, $parent_id, $sort_order, $iconFilename, $id]);
+            if ($iconFilename && !empty($currentForSave['icon'])) deleteCategoryIcon($currentForSave['icon']);
             flash('success', 'دسته‌بندی با موفقیت ویرایش شد.');
         } else {
             // Insert with type
-            $stmt = $pdo->prepare("INSERT INTO categories (name, slug, description, parent_id, type, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $slug, $description, $parent_id, $type, $iconFilename, $sort_order]);
+            $stmt = $pdo->prepare("INSERT INTO categories (name, slug, description, base_url, parent_id, type, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $slug, $description, $baseUrl !== '' ? $baseUrl : null, $parent_id, $type, $iconFilename, $sort_order]);
             flash('success', 'دسته‌بندی با موفقیت اضافه شد.');
         }
         redirect(SITE_URL . '/admin/categories.php');
@@ -125,8 +143,10 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
     <?php if ($action === 'add' || $action === 'edit'): ?>
         <div class="form-container card">
             <h2><?= $action === 'edit' ? 'ویرایش دسته‌بندی' : 'افزودن دسته‌بندی جدید' ?></h2>
-            <form action="<?= SITE_URL ?>/admin/categories.php?action=<?= $action ?>&id=<?= $id ?>" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
+            <form id="category-editor-form" action="<?= SITE_URL ?>/admin/categories.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="category_action" value="<?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="category_id" value="<?= (int)$id ?>">
                 
                 <div class="form-group">
                     <label for="name">نام دسته‌بندی <span class="required">*</span></label>
@@ -170,28 +190,39 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
                 </div>
                 <div class="form-group">
                     <label for="description">توضیحات</label>
-                    <textarea id="description" name="description" rows="3"><?= htmlspecialchars($currentCat['description'] ?? '') ?></textarea>
+                    <textarea id="description" name="description" rows="3"><?= htmlspecialchars((string)($currentCat['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="base_url">نشانی پایه (Base URL) — اختیاری</label>
+                    <input type="url" id="base_url" name="base_url" value="<?= htmlspecialchars((string)($currentCat['base_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" dir="ltr" maxlength="1000" placeholder="https://mirror.example.org/repository">
+                    <small class="form-hint">نشانی پایهٔ رسمی یا ریشهٔ مخزن این دسته. فقط URL کامل با http یا https پذیرفته می‌شود؛ این مقدار از پروتکل ثبت‌شده در متادیتا جداست.</small>
                 </div>
                 <div class="form-group">
                     <label for="icon">آیکون دسته‌بندی (اختیاری)</label>
                     <?php if ($action === 'edit' && !empty($currentCat['icon'])): ?>
-                        <div style="margin-bottom: 1rem;">
-                            <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($currentCat['icon']) ?>" alt="Category Icon" class="icon-upload-preview">
-                            <form action="<?= SITE_URL ?>/admin/categories.php?id=<?= $id ?>" method="POST" style="display: inline-block; margin-right: 1rem;" onsubmit="return confirm('آیا از حذف آیکون مطمئن هستید؟');">
-                                <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
-                                <input type="hidden" name="req_action" value="delete_icon">
-                                <button type="submit" class="btn btn-sm btn-danger">حذف آیکون</button>
-                            </form>
+                        <div class="category-icon-current">
+                            <img src="<?= SITE_URL ?>/uploads/category-icons/<?= rawurlencode((string)$currentCat['icon']) ?>" alt="آیکون فعلی دسته‌بندی" class="icon-upload-preview">
+                            <button type="submit" form="delete-category-icon-form" class="btn btn-sm btn-danger">حذف آیکون فعلی</button>
                         </div>
                     <?php endif; ?>
-                    <input type="file" id="icon" name="icon" accept="image/png,image/jpeg,image/webp">
-                    <small class="form-hint">فرمت‌های مجاز: PNG، JPG و WebP | حداکثر حجم: ۵۰۰ کیلوبایت</small>
+                    <div class="mh-file-upload-zone" data-upload-zone>
+                        <input type="file" id="icon" name="icon" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp">
+                        <span class="mh-file-upload-prompt"><?= icon('image', 22) ?><strong>فایل آیکون را انتخاب کنید یا اینجا رها کنید</strong><small>امکان چسباندن تصویر با Ctrl+V نیز وجود دارد • SVG، PNG، JPG یا WebP • حداکثر ۵۰۰ کیلوبایت</small></span>
+                    </div>
+                    <small class="form-hint">SVGهای دارای اسکریپت، رویدادهای فعال یا ارجاع به منابع خارجی رد می‌شوند.</small>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">ذخیره</button>
                     <a href="<?= SITE_URL ?>/admin/categories.php" class="btn btn-outline">انصراف</a>
                 </div>
             </form>
+            <?php if ($action === 'edit' && !empty($currentCat['icon'])): ?>
+                <form id="delete-category-icon-form" action="<?= SITE_URL ?>/admin/categories.php" method="POST" hidden>
+                    <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="req_action" value="delete_icon">
+                    <input type="hidden" name="category_id" value="<?= (int)$id ?>">
+                </form>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="table-container card">
@@ -202,13 +233,14 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
                         <th>نامک</th>
                         <th>نوع</th>
                         <th>والد</th>
+                        <th>نشانی پایه</th>
                         <th>ترتیب</th>
                         <th>عملیات</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($categories)): ?>
-                        <tr><td colspan="6" class="empty-state">دسته‌بندی‌ای یافت نشد.</td></tr>
+                        <tr><td colspan="7" class="empty-state">دسته‌بندی‌ای یافت نشد.</td></tr>
                     <?php else: ?>
                         <?php foreach ($categories as $cat): ?>
                             <tr>
@@ -221,11 +253,13 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
                                 <td data-label="نامک" class="ltr-text"><?= htmlspecialchars($cat['slug']) ?></td>
                                 <td data-label="نوع"><span class="badge category-type-<?= $cat['type'] ?? 'software' ?>"><?= htmlspecialchars(getCategoryTypeLabel($cat['type'] ?? 'software')) ?></span></td>
                                 <td data-label="والد"><?= $cat['parent_name'] ? htmlspecialchars($cat['parent_name']) : '<span class="badge badge-default">ریشه</span>' ?></td>
+                                <td data-label="نشانی پایه"><?php if (!empty($cat['base_url'])): ?><a class="ltr-text" href="<?= htmlspecialchars($cat['base_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars(excerpt($cat['base_url'], 38), ENT_QUOTES, 'UTF-8') ?></a><?php else: ?>—<?php endif; ?></td>
                                 <td data-label="ترتیب"><?= (int)$cat['sort_order'] ?></td>
                                 <td data-label="عملیات" class="actions">
                                     <a href="?action=edit&id=<?= $cat['id'] ?>" class="btn btn-sm btn-outline">ویرایش</a>
-                                    <form action="?id=<?= $cat['id'] ?>" method="POST" class="inline-form" onsubmit="return confirm('آیا از حذف مطمئن هستید؟');">
-                                        <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
+                                    <form action="<?= SITE_URL ?>/admin/categories.php" method="POST" class="inline-form" onsubmit="return confirm('آیا از حذف مطمئن هستید؟');">
+                                        <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="category_id" value="<?= (int)$cat['id'] ?>">
                                         <input type="hidden" name="req_action" value="delete">
                                         <button type="submit" class="btn btn-sm btn-danger">حذف</button>
                                     </form>

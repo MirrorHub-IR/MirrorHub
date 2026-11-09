@@ -3,11 +3,12 @@ require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/layout.php';
 requireAdmin();
+ensureCategoryBaseUrlSchema($pdo);
 
 require_once __DIR__ . '/../includes/donate.php';
 ensureDonateSchema($pdo);
 
-const MIRRORHUB_BACKUP_VERSION = 4;
+const MIRRORHUB_BACKUP_VERSION = 5;
 $backupTables = [
     'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
     'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
@@ -69,6 +70,163 @@ function fetchBackupRows(array $backup, string $table): array {
     return $backup['tables'][$table]['rows'];
 }
 
+/**
+ * Reject unsafe archive paths before they are ever combined with the upload root.
+ */
+function backupNormalizeUploadPath(string $path): string {
+    $path = trim($path);
+    if ($path === '' || strlen($path) > 500 || str_contains($path, "\\\\") || str_contains($path, "\0")) {
+        throw new RuntimeException('مسیر فایل آپلودی در پشتیبان نامعتبر است.');
+    }
+    if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:/', $path)) {
+        throw new RuntimeException('مسیر مطلق در فایل پشتیبان مجاز نیست.');
+    }
+    $parts = explode('/', $path);
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.' || $part === '..') {
+            throw new RuntimeException('مسیر فایل آپلودی در پشتیبان نامعتبر است.');
+        }
+    }
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if (in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
+        throw new RuntimeException('بازیابی فایل اجرایی از مسیر آپلود مجاز نیست.');
+    }
+    return implode('/', $parts);
+}
+
+/**
+ * Capture regular files below /uploads (no symlinks or executable payloads).
+ * The archive is deliberately bounded because JSON/base64 expands the raw data.
+ */
+function backupCollectUploadFiles(): array {
+    $root = dirname(__DIR__) . '/uploads';
+    if (is_link($root) || !is_dir($root)) return [];
+    $rootReal = realpath($root);
+    if ($rootReal === false) return [];
+
+    $files = [];
+    $totalBytes = 0;
+    $maxFiles = 1000;
+    $maxFileBytes = 10 * 1024 * 1024;
+    $maxTotalBytes = 64 * 1024 * 1024;
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($rootReal, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY
+    );
+    foreach ($iterator as $item) {
+        if (!$item instanceof SplFileInfo || $item->isLink() || !$item->isFile()) continue;
+        $absolute = $item->getPathname();
+        $real = realpath($absolute);
+        if ($real === false || !str_starts_with($real, $rootReal . DIRECTORY_SEPARATOR)) continue;
+        $relative = substr(str_replace('\\\\', '/', $real), strlen(str_replace('\\\\', '/', $rootReal)) + 1);
+        try {
+            $relative = backupNormalizeUploadPath($relative);
+        } catch (RuntimeException $unsafePath) {
+            // Skip files that cannot safely be restored (for example server-side scripts).
+            continue;
+        }
+        $size = (int)$item->getSize();
+        if ($size < 0 || $size > $maxFileBytes || $totalBytes + $size > $maxTotalBytes) {
+            throw new RuntimeException('حجم فایل‌های آپلودی بیش از سقف مجاز پشتیبان‌گیری است (هر فایل ۱۰ و مجموع ۶۴ مگابایت).');
+        }
+        $content = file_get_contents($real);
+        if ($content === false || strlen($content) !== $size) {
+            throw new RuntimeException('خواندن یکی از فایل‌های آپلودی برای پشتیبان‌گیری ناموفق بود.');
+        }
+        $files[] = [
+            'path' => $relative,
+            'size' => strlen($content),
+            'sha256' => hash('sha256', $content),
+            'content_base64' => base64_encode($content),
+        ];
+        $totalBytes += $size;
+        if (count($files) > $maxFiles) {
+            throw new RuntimeException('تعداد فایل‌های آپلودی از سقف ۱۰۰۰ فایل بیشتر است.');
+        }
+    }
+    return $files;
+}
+
+/** Validate and decode the complete upload manifest before database changes begin. */
+function backupValidateUploadFiles($entries): array {
+    if (!is_array($entries)) throw new RuntimeException('فهرست فایل‌های آپلودی در پشتیبان نامعتبر است.');
+    if (count($entries) > 1000) throw new RuntimeException('تعداد فایل‌های پشتیبان بیش از حد مجاز است.');
+
+    $decoded = [];
+    $totalBytes = 0;
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) throw new RuntimeException('ساختار یکی از فایل‌های آپلودی نامعتبر است.');
+        $path = backupNormalizeUploadPath((string)($entry['path'] ?? ''));
+        if (array_key_exists($path, $decoded)) throw new RuntimeException('مسیر تکراری در فایل پشتیبان وجود دارد.');
+        $encoded = (string)($entry['content_base64'] ?? '');
+        $content = base64_decode($encoded, true);
+        if ($content === false) throw new RuntimeException('کدگذاری یکی از فایل‌های آپلودی نامعتبر است.');
+        $size = (int)($entry['size'] ?? -1);
+        if ($size !== strlen($content) || $size < 0 || $size > 10 * 1024 * 1024) {
+            throw new RuntimeException('اندازهٔ یکی از فایل‌های آپلودی با محتوای آن مطابقت ندارد.');
+        }
+        $sha256 = strtolower((string)($entry['sha256'] ?? ''));
+        if (!preg_match('/^[a-f0-9]{64}$/', $sha256) || !hash_equals($sha256, hash('sha256', $content))) {
+            throw new RuntimeException('امضای SHA-256 یکی از فایل‌های آپلودی درست نیست.');
+        }
+        $totalBytes += $size;
+        if ($totalBytes > 64 * 1024 * 1024) throw new RuntimeException('حجم مجموع فایل‌های آپلودی بیش از ۶۴ مگابایت است.');
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            $safeSvg = function_exists('sanitizeCategorySvg') ? sanitizeCategorySvg($content) : false;
+            if ($safeSvg === false) throw new RuntimeException('فایل SVG در پشتیبان ناامن یا نامعتبر است.');
+            $content = $safeSvg;
+        }
+        $decoded[$path] = $content;
+    }
+    return $decoded;
+}
+
+/** Restore validated upload files atomically below /uploads; existing files are replaced by archive copies. */
+function backupRestoreUploadFiles(array $files): int {
+    if (!$files) return 0;
+    $root = dirname(__DIR__) . '/uploads';
+    if (is_link($root)) throw new RuntimeException('پوشهٔ uploads نباید symbolic link باشد.');
+    if (!is_dir($root) && !mkdir($root, 0755, true) && !is_dir($root)) {
+        throw new RuntimeException('ساخت پوشهٔ uploads برای بازیابی فایل‌ها ناموفق بود.');
+    }
+    $rootReal = realpath($root);
+    if ($rootReal === false) throw new RuntimeException('مسیر uploads قابل دسترسی نیست.');
+
+    $restored = 0;
+    foreach ($files as $relative => $content) {
+        $relative = backupNormalizeUploadPath((string)$relative);
+        $parts = explode('/', $relative);
+        $filename = array_pop($parts);
+        $directory = $rootReal;
+        foreach ($parts as $part) {
+            $directory .= DIRECTORY_SEPARATOR . $part;
+            if (is_link($directory)) throw new RuntimeException('بازیابی به مسیر دارای symbolic link مجاز نیست.');
+            if (!is_dir($directory) && !mkdir($directory, 0755) && !is_dir($directory)) {
+                throw new RuntimeException('ساخت یکی از پوشه‌های فایل آپلودی ناموفق بود.');
+            }
+            $resolvedDirectory = realpath($directory);
+            if ($resolvedDirectory === false || !str_starts_with($resolvedDirectory, $rootReal . DIRECTORY_SEPARATOR)) {
+                throw new RuntimeException('مسیر فایل آپلودی از پوشهٔ uploads خارج می‌شود.');
+            }
+            $directory = $resolvedDirectory;
+        }
+        $target = $directory . DIRECTORY_SEPARATOR . $filename;
+        if (is_link($target)) throw new RuntimeException('بازنویسی فایل symbolic link مجاز نیست.');
+        $temporary = $target . '.mirrorhub-' . bin2hex(random_bytes(8)) . '.tmp';
+        if (file_put_contents($temporary, $content, LOCK_EX) === false) {
+            throw new RuntimeException('نوشتن یکی از فایل‌های آپلودی ناموفق بود.');
+        }
+        @chmod($temporary, 0644);
+        if (!@rename($temporary, $target)) {
+            @unlink($temporary);
+            throw new RuntimeException('جایگزینی اتمیک یکی از فایل‌های آپلودی ناموفق بود.');
+        }
+        $restored++;
+    }
+    return $restored;
+}
+
 function mappedId(array $map, $oldId, string $label): ?int {
     if ($oldId === null || $oldId === '' || (int)$oldId === 0) return null;
     $oldId = (int)$oldId;
@@ -77,12 +235,19 @@ function mappedId(array $map, $oldId, string $label): ?int {
 }
 
 if (($_GET['action'] ?? '') === 'export') {
+    try {
+        $uploadArchive = backupCollectUploadFiles();
+    } catch (Throwable $uploadError) {
+        flash('error', 'ساخت پشتیبان فایل‌های آپلودی ناموفق بود: ' . $uploadError->getMessage());
+        redirect(SITE_URL . '/admin/backup.php');
+    }
     $payload = [
         'format' => 'mirrorhub-backup',
         'version' => MIRRORHUB_BACKUP_VERSION,
         'exported_at' => date('c'),
         'site' => SITE_NAME,
         'tables' => [],
+        'files' => $uploadArchive,
     ];
 
     // Use a consistent snapshot so related tables are not exported from different points in time.
@@ -134,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
 
     $file = $_FILES['backup_file'];
     if (($file['size'] ?? 0) > 25 * 1024 * 1024) {
-        flash('error', 'حجم فایل پشتیبان نباید بیشتر از ۲۵ مگابایت باشد.');
+        flash('error', 'حجم فایل پشتیبان نباید بیشتر از ۱۰۰ مگابایت باشد.');
         redirect(SITE_URL . '/admin/backup.php');
     }
     if (strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION)) !== 'json') {
@@ -151,10 +316,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
     try {
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
         $backupVersion = (int)($backup['version'] ?? 0);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, MIRRORHUB_BACKUP_VERSION], true)) {
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, 4, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
+        if ($backupVersion >= 5 && !isset($backup['files'])) throw new RuntimeException('فهرست فایل‌های آپلودی در پشتیبان نسخهٔ ۵ وجود ندارد.');
+        $restorableUploadFiles = backupValidateUploadFiles($backup['files'] ?? []);
+        $restoredUploadCount = 0;
 
         $legacyMissingTables = [];
         $legacyTablesByVersion = [
@@ -219,9 +387,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
             foreach (['users','categories','mirrors','requests','visits','mirror_categories','request_links','mirror_protocols','request_protocols','cms_articles','mirror_checks','mirror_status','mirror_daily_stats','mirror_incidents','monitor_settings','mirror_repository_health'] as $table) {
                 foreach (fetchBackupRows($backup, $table) as $row) insertRow($pdo, $table, $row, $columnMap[$table], true);
             }
+            $restoredUploadCount = backupRestoreUploadFiles($restorableUploadFiles);
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
             $pdo->commit();
-            flash('success', 'داده‌های فعلی حذف و پشتیبان با موفقیت جایگزین شد.');
+            flash('success', 'داده‌های فعلی حذف و پشتیبان با موفقیت جایگزین شد. فایل‌های آپلودی بازیابی‌شده: ' . $restoredUploadCount . ' عدد.');
         } else {
             $maps = ['users'=>[],'categories'=>[],'mirrors'=>[],'requests'=>[]];
 
@@ -391,9 +560,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
                 insertRow($pdo, 'cms_articles', $row, $columnMap['cms_articles'], false);
             }
 
+            $restoredUploadCount = backupRestoreUploadFiles($restorableUploadFiles);
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
             $pdo->commit();
-            flash('success', 'داده‌های پشتیبان با حفظ اطلاعات فعلی به سیستم اضافه شد.');
+            flash('success', 'داده‌های پشتیبان با حفظ اطلاعات فعلی اضافه شد. فایل‌های آپلودی بازیابی‌شده: ' . $restoredUploadCount . ' عدد.');
         }
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -420,37 +590,37 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
     </div>
 
     <div class="alert alert-warning" role="note">
-        فایل پشتیبان شامل تاریخچهٔ پایش، تنظیمات سلامت metadata و تنظیمات خصوصی اعلان‌هاست. آن را محرمانه نگه دارید و پیش از بازیابی در محیط تولید از داده‌های فعلی نسخهٔ جداگانه بگیرید.
+        فایل پشتیبان شامل همهٔ جدول‌های پایگاه داده و فایل‌های موجود در پوشهٔ uploads (از جمله آیکون دسته‌بندی‌ها) است. سقف هر فایل ۱۰ و مجموع فایل‌ها ۶۴ مگابایت است. فایل پشتیبان ممکن است حاوی توکن‌ها و تنظیمات خصوصی باشد؛ آن را محرمانه نگه دارید و پیش از بازیابی نسخهٔ جداگانه تهیه کنید.
     </div>
 
     <div class="backup-actions-grid">
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('database', 21) ?></span>
-                <div><h2>خروجی داده‌ها</h2><p>تمام جدول‌های MirrorHub با ستون‌ها و رکوردها داخل یک JSON استاندارد ذخیره می‌شوند.</p></div>
+                <div><h2>خروجی داده‌ها</h2><p>جدول‌های پایگاه داده و فایل‌های آپلودشدهٔ پوشهٔ uploads داخل یک JSON نسخه‌دار ذخیره می‌شوند.</p></div>
             </div>
             <a href="<?= SITE_URL ?>/admin/backup.php?action=export" class="btn btn-primary backup-download">دانلود فایل پشتیبان</a>
             <div class="backup-meta">
-                <span class="badge badge-default">JSON</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">شامل روابط و پروتکل‌ها</span>
+                <span class="badge badge-default">JSON</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">شامل روابط، پروتکل‌ها و آپلودها</span>
             </div>
         </div>
 
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('inbox', 21) ?></span>
-                <div><h2>ورودی داده‌ها</h2><p>فایل JSON را بکشید و رها کنید یا روی ناحیه زیر کلیک کنید.</p></div>
+                <div><h2>ورودی داده‌ها</h2><p>فایل JSON را انتخاب کنید، بکشید و رها کنید یا پس از تمرکز روی ناحیه با Ctrl+V بچسبانید.</p></div>
             </div>
 
             <form action="<?= SITE_URL ?>/admin/backup.php" method="POST" enctype="multipart/form-data" id="backup-import-form">
                 <input type="hidden" name="<?= CSRF_TOKEN_NAME ?>" value="<?= generateCsrfToken() ?>">
                 <input type="hidden" name="backup_action" value="import">
 
-                <label class="import-zone" id="backup-dropzone" for="backup-file">
+                <label class="import-zone" id="backup-dropzone" data-upload-zone for="backup-file">
                     <input type="file" id="backup-file" name="backup_file" accept=".json,application/json" required>
                     <div>
                         <div class="import-zone-icon"><?= icon('inbox', 25) ?></div>
                         <strong>فایل JSON را اینجا رها کنید</strong>
-                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۲۵ مگابایت</span>
+                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت</span>
                     </div>
                 </label>
 

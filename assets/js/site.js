@@ -44,6 +44,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     }
 
+
+    /* Generic upload UX: keyboard focus, drag/drop and paste from the clipboard. */
+    let activeUploadInput = null;
+    const uploadInputs = Array.from(document.querySelectorAll('input[type="file"]'));
+
+    const matchesFileAccept = (file, input) => {
+        const accept = (input.getAttribute('accept') || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+        if (!accept.length) return true;
+        const name = (file.name || '').toLowerCase();
+        const type = (file.type || '').toLowerCase();
+        return accept.some(rule => {
+            if (rule.startsWith('.')) return name.endsWith(rule);
+            if (rule.endsWith('/*')) return type.startsWith(rule.slice(0, -1));
+            return type === rule;
+        });
+    };
+
+    const assignUploadFiles = (input, fileList) => {
+        if (!input || !fileList || !fileList.length) return false;
+        const accepted = Array.from(fileList).filter(file => matchesFileAccept(file, input));
+        const selected = input.multiple ? accepted : accepted.slice(0, 1);
+        if (!selected.length) {
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('نوع فایل با فرمت‌های مجاز این بخش سازگار نیست.', 'warning', 'فرمت نامعتبر');
+            }
+            return false;
+        }
+        try {
+            const transfer = new DataTransfer();
+            selected.forEach(file => transfer.items.add(file));
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        } catch (_) {
+            return false;
+        }
+    };
+
+    uploadInputs.forEach(input => {
+        const zone = input.closest('[data-upload-zone]') || input.parentElement;
+        if (!zone) return;
+        zone.classList.add('mh-upload-zone');
+        if (!zone.hasAttribute('tabindex')) zone.setAttribute('tabindex', '0');
+        if (!zone.hasAttribute('role') && !zone.matches('label')) zone.setAttribute('role', 'group');
+        if (input.disabled) return;
+
+        const isBackupDropzone = zone.id === 'backup-dropzone';
+        if (!zone.querySelector('.mh-upload-instructions') && !zone.querySelector('.mh-file-upload-prompt') && !isBackupDropzone) {
+            const hint = document.createElement('small');
+            hint.className = 'mh-upload-instructions';
+            hint.textContent = 'برای انتخاب کلیک کنید، فایل را اینجا رها کنید یا پس از تمرکز روی این بخش با Ctrl+V بچسبانید.';
+            zone.appendChild(hint);
+        }
+
+        const activate = () => { activeUploadInput = input; };
+        zone.addEventListener('focusin', activate);
+        input.addEventListener('focus', activate);
+        zone.addEventListener('click', activate);
+        zone.addEventListener('keydown', event => {
+            if (event.target !== zone || !['Enter', ' '].includes(event.key)) return;
+            event.preventDefault();
+            input.click();
+            activate();
+        });
+
+        if (isBackupDropzone) return; // backup-specific handler also updates the selected-file summary.
+        ['dragenter', 'dragover'].forEach(type => zone.addEventListener(type, event => {
+            event.preventDefault();
+            event.stopPropagation();
+            activate();
+            zone.classList.add('is-dragging');
+        }));
+        ['dragleave', 'drop'].forEach(type => zone.addEventListener(type, event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (type === 'drop') assignUploadFiles(input, event.dataTransfer && event.dataTransfer.files);
+            zone.classList.remove('is-dragging');
+        }));
+    });
+
+    document.addEventListener('focusin', event => {
+        if (activeUploadInput && !event.target.closest('.mh-upload-zone') && event.target !== activeUploadInput) {
+            activeUploadInput = null;
+        }
+    });
+
+    document.addEventListener('paste', event => {
+        const files = event.clipboardData && event.clipboardData.files;
+        if (!activeUploadInput || !files || !files.length) return;
+        if (assignUploadFiles(activeUploadInput, files)) event.preventDefault();
+    });
+
     document.addEventListener('keydown', event => {
         if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
         const active = document.activeElement;

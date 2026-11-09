@@ -28,6 +28,7 @@ renderHeader('راهنمای مدیریت', true);
         <a href="#guide-categories"><?= icon('folder', 16) ?><span>دسته‌بندی و میرورها</span></a>
         <a href="#guide-security"><?= icon('check', 16) ?><span>پشتیبان و امنیت</span></a>
         <a href="#guide-repository"><?= icon('check', 16) ?><span>سلامت مخزن</span></a>
+        <a href="#guide-uploads"><?= icon('image', 16) ?><span>آپلود فایل</span></a>
     </nav>
 
     <div class="admin-guide-grid">
@@ -77,6 +78,8 @@ renderHeader('راهنمای مدیریت', true);
                 <div><dt>خطاهای متوالی</dt><dd>برای جلوگیری از تشخیص قطعی کاذب؛ مقدار ۲ نقطهٔ شروع محافظه‌کارانه‌ای است.</dd></div>
                 <div><dt>نگهداری تاریخچه</dt><dd>تعداد روزهایی که رویدادها و نتایج بررسی نگهداری می‌شوند.</dd></div>
             </dl>
+            <p class="admin-guide-note">فیلتر صفحه بر اساس scheme واقعی URL انجام می‌شود: فقط نشانی‌های شروع‌شونده با <code>http://</code> و <code>https://</code> وارد پایش می‌شوند. فیلد «پروتکل» در ویرایش میرور صرفاً متادیتاست و eligibility پایش را تعیین نمی‌کند. داشبورد وضعیت را در کارت‌های سازگار با موبایل و دسکتاپ نشان می‌دهد.</p>
+            <p>در نوار بالای فهرست می‌توانید همهٔ نشانی‌ها، فقط HTTP یا فقط HTTPS را انتخاب کنید. آمار پاسخ، کد HTTP، آپتایم، روند پاسخ و سلامت metadata در کارت هر میرور نمایش داده می‌شود.</p>
             <p class="admin-guide-note">پایش HTTP/HTTPS به‌تنهایی صحت تمام بسته‌ها، تازگی همهٔ metadataها یا اعتبار امضاهای رمزنگاری‌شده را تضمین نمی‌کند.</p>
             <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/monitor.php"><?= icon('activity', 15) ?> باز کردن تنظیمات پایش</a>
         </article>
@@ -91,6 +94,13 @@ renderHeader('راهنمای مدیریت', true);
                 <div><strong>دستهٔ ارائه‌دهنده</strong><p>تعیین می‌کند کدام سرورها در چرخهٔ پایش قرار بگیرند.</p></div>
             </div>
             <p class="admin-guide-note">یک میرور برای ورود به چرخهٔ پایش باید فعال باشد و حداقل به یک دستهٔ ارائه‌دهنده متصل شده باشد.</p>
+            <h3>نشانی پایه و آیکون دسته</h3>
+            <ol class="admin-guide-steps">
+                <li>هنگام افزودن یا ویرایش دسته، مقدار «نشانی پایه (Base URL)» را در صورت نیاز وارد کنید؛ این URL باید کامل و با <code>http://</code> یا <code>https://</code> شروع شود.</li>
+                <li>Base URL در صفحهٔ عمومی همان دسته نمایش داده می‌شود و با مقدار پروتکل میرور متفاوت است.</li>
+                <li>برای آیکون، فایل SVG، PNG، JPG یا WebP تا ۵۰۰ کیلوبایت انتخاب کنید. SVG باید فقط شکل و مسیر ثابت داشته باشد؛ اسکریپت، رویداد یا منبع خارجی مجاز نیست.</li>
+                <li>برای حذف آیکون فعلی از دکمهٔ جداگانهٔ «حذف آیکون فعلی» استفاده کنید؛ فرم حذف مستقل از فرم ویرایش است.</li>
+            </ol>
             <div class="admin-guide-actions">
                 <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/categories.php">دسته‌بندی‌ها</a>
                 <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/mirrors.php">میرورها</a>
@@ -105,10 +115,27 @@ renderHeader('راهنمای مدیریت', true);
             <ol class="admin-guide-steps">
                 <li>پیش از تغییرات عمده یا بازیابی اطلاعات، یک نسخهٔ پشتیبان تازه تهیه کنید.</li>
                 <li>مقاله‌های CMS همراه پشتیبان کامل پایگاه داده نگهداری می‌شوند.</li>
+                <li>فایل‌های موجود در پوشهٔ <code>uploads/</code>، از جمله آیکون دسته‌ها، در JSON پشتیبان نسخهٔ ۵ نیز ذخیره می‌شوند.</li>
+                <li>برای بازگردانی فایل‌ها، همان فایل JSON نسخهٔ ۵ یا جدیدتر را وارد کنید؛ مسیرها و هش فایل‌ها هنگام بازیابی بررسی می‌شوند.</li>
                 <li>کلید Cron، توکن ربات بله و مشخصات اتصال دیتابیس را در مخزن عمومی، اسکرین‌شات یا گزارش عمومی منتشر نکنید.</li>
                 <li>اگر اطلاعات محرمانه قبلاً وارد تاریخچهٔ Git شده، مقدار افشاشده را تعویض کنید؛ حذف فایل از آخرین Commit کافی نیست.</li>
             </ol>
             <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/backup.php"><?= icon('database', 15) ?> مدیریت پشتیبان‌ها</a>
+        </article>
+
+        <article class="admin-guide-card" id="guide-uploads">
+            <div class="admin-guide-card-heading">
+                <span class="admin-guide-number">۰۷</span>
+                <div><span class="admin-guide-kicker">آپلود و انتخاب فایل</span><h2>انتخاب، کشیدن و چسباندن فایل</h2></div>
+            </div>
+            <ol class="admin-guide-steps">
+                <li>در هر ورودی فایل، روی ناحیهٔ انتخاب تمرکز کنید یا آن را لمس کنید.</li>
+                <li>فایل را از سیستم روی ناحیه بکشید و رها کنید؛ پس از انتخاب، نام و اندازهٔ فایل در همان فرم نمایش داده می‌شود.</li>
+                <li>برای چسباندن تصویر کپی‌شده، ابتدا ناحیهٔ آپلود را انتخاب کنید و سپس <kbd>Ctrl+V</kbd> (در macOS: <kbd>⌘+V</kbd>) را بزنید.</li>
+                <li>نوع و اندازهٔ فایل همچنان در سرور بررسی می‌شود؛ انتخاب فایل به‌معنی پذیرش نهایی آن نیست.</li>
+            </ol>
+            <p class="admin-guide-note">در صفحهٔ پشتیبان، فایل JSON تا ۱۰۰ مگابایت در فرم پذیرفته می‌شود؛ محدودیت واقعی هاست مانند <code>upload_max_filesize</code> و <code>post_max_size</code> نیز باید کافی باشد.</p>
+            <a class="btn btn-outline" href="<?= SITE_URL ?>/admin/backup.php"><?= icon('database', 15) ?> پشتیبان و فایل‌ها</a>
         </article>
 
         <article class="admin-guide-card" id="guide-repository">

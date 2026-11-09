@@ -3,7 +3,8 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 require_once 'includes/layout.php';
 
-$slug = sanitize($_GET['slug'] ?? '');
+ensureCategoryBaseUrlSchema($pdo);
+$slug = trim((string)($_GET['slug'] ?? ''));
 if (!$slug) redirect(SITE_URL . '/index.php');
 
 $category = getCategoryBySlug($pdo, $slug);
@@ -86,7 +87,10 @@ renderHeader($category['name']);
         <span class="badge badge-primary"><?= count($mirrors) ?> میرور</span>
     </div>
     <?php if ($category['description']): ?>
-        <p class="category-desc"><?= htmlspecialchars($category['description']) ?></p>
+        <p class="category-desc"><?= htmlspecialchars($category['description'], ENT_QUOTES, 'UTF-8') ?></p>
+    <?php endif; ?>
+    <?php if (!empty($category['base_url'])): ?>
+        <p class="category-base-url"><strong>نشانی پایهٔ این دسته:</strong> <a href="<?= htmlspecialchars($category['base_url'], ENT_QUOTES, 'UTF-8') ?>" class="ltr-text" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($category['base_url'], ENT_QUOTES, 'UTF-8') ?></a></p>
     <?php endif; ?>
 </section>
 
