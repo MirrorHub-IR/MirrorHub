@@ -1044,7 +1044,8 @@ function monitorStatusSummary(PDO $pdo): array {
         $out['mirrors'] = (int)$pdo->query("SELECT COUNT(DISTINCT m.id) FROM mirrors m
             INNER JOIN mirror_categories mc ON mc.mirror_id = m.id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
-            WHERE m.status = 'active'")->fetchColumn();
+            WHERE m.status = 'active'
+              AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')")->fetchColumn();
 
         $stmt = $pdo->query("SELECT COALESCE(ms.status, 'unknown') AS status, COUNT(DISTINCT m.id) AS c
             FROM mirrors m
@@ -1060,9 +1061,15 @@ function monitorStatusSummary(PDO $pdo): array {
         }
 
         $agg = $pdo->query("SELECT COUNT(*) AS total,
-                    SUM(status IN ('up','slow')) AS ok,
-                    AVG(CASE WHEN status IN ('up','slow') AND response_ms IS NOT NULL THEN response_ms END) AS avg_ms
-                FROM mirror_checks WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch();
+                    SUM(mc.status IN ('up','slow')) AS ok,
+                    AVG(CASE WHEN mc.status IN ('up','slow') AND mc.response_ms IS NOT NULL THEN mc.response_ms END) AS avg_ms
+                FROM mirror_checks mc
+                INNER JOIN mirrors m ON m.id = mc.mirror_id
+                INNER JOIN mirror_categories mcat ON mcat.mirror_id = m.id
+                INNER JOIN categories c ON c.id = mcat.category_id AND c.type = 'provider'
+                WHERE mc.checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                  AND m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%')")->fetch();
         if ($agg && (int)$agg['total'] > 0) {
             $out['uptime_percent'] = round((int)$agg['ok'] * 100 / (int)$agg['total'], 2);
             $out['avg_response_ms'] = $agg['avg_ms'] !== null ? (int)round((float)$agg['avg_ms']) : null;
@@ -1072,7 +1079,9 @@ function monitorStatusSummary(PDO $pdo): array {
         $out['open_incidents'] = (int)$pdo->query("SELECT COUNT(DISTINCT i.id) FROM mirror_incidents i
             INNER JOIN mirror_categories mc ON mc.mirror_id = i.mirror_id
             INNER JOIN categories c ON c.id = mc.category_id AND c.type = 'provider'
-            WHERE i.ended_at IS NULL")->fetchColumn();
+            WHERE i.ended_at IS NULL
+              AND EXISTS (SELECT 1 FROM mirrors m WHERE m.id = i.mirror_id AND m.status = 'active'
+                  AND (LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%'))")->fetchColumn();
 
         $settings = monitorSettings($pdo);
         $out['last_run_at'] = $settings['last_run_at'] ?: null;
