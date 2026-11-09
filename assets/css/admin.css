@@ -426,7 +426,7 @@
 .admin-layout .mon-url { display: block; direction: ltr; text-align: left; font-size: .72rem; }
 .admin-layout .mon-uptime-num { margin-bottom: 6px; color: #dce9dd; font-variant-numeric: tabular-nums; }
 .admin-layout .mon-last-check { display: block; margin-top: 5px; color: #7f9485; font-size: .7rem; }
-.admin-layout .mon-table { min-width: 1160px; }
+ .admin-layout .mon-table { min-width: 0; }
 .admin-layout .mon-table-wrap { margin-top: 10px; }
 .admin-layout .mon-error-cell { color: #e7a4a4 !important; background: rgba(236,107,107,.045); }
 .admin-layout .mon-info-box { margin: 0 0 16px; }
