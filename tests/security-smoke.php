@@ -95,7 +95,7 @@ $assert(str_contains($categoryFunctions, 'getimagesize'), 'Uploaded raster categ
 $assert(str_contains($categoryAdmin, 'image/svg+xml') && str_contains($categoryAdmin, 'name="base_url"'), 'Category editor must accept SVG icons and expose a base URL.');
 $assert(str_contains($categoryAdmin, 'delete-category-icon-form'), 'Category icon removal form must be separate from the edit form.');
 $assert(!str_contains($categoryAdmin, '<form action="<?= SITE_URL ?>/admin/categories.php?id=<?= $id ?>" method="POST" style="display: inline-block;'), 'Category editor must not contain nested forms.');
-$assert(str_contains($categoryPublic, "$category['base_url']"), 'Public category page must display the configured base URL.');
+$assert(str_contains($categoryPublic, "\$category['base_url']"), 'Public category page must display the configured base URL.');
 $assert(str_contains($categoryFunctions, "'code-2' =>"), 'Development SVG icon must exist in the icon registry.');
 $assert(str_contains($contributePage, "icon('code-2', 24)"), 'Project development contribution card must display its icon.');
 $assert(str_contains($ignore, '/config.local.php'), 'Local config must be git-ignored.');
