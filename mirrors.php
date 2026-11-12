@@ -37,19 +37,27 @@ if ($providerFilter) {
     $baseParts = parse_url((string)$providerFilter['base_url']);
     $baseScheme = strtolower((string)($baseParts['scheme'] ?? ''));
     $baseHost = strtolower((string)($baseParts['host'] ?? ''));
-    $basePort = isset($baseParts['port']) ? ':' . (int)$baseParts['port'] : '';
+    $defaultPort = $baseScheme === 'https' ? 443 : 80;
+    $basePortNumber = (int)($baseParts['port'] ?? $defaultPort);
+    $portSuffixes = $basePortNumber === $defaultPort ? ['', ':' . $defaultPort] : [':' . $basePortNumber];
     $basePath = rtrim((string)($baseParts['path'] ?? ''), '/');
-    $basePrefix = $baseScheme . '://' . $baseHost . $basePort . $basePath;
-    $escapedPrefix = strtr($basePrefix, ['!' => '!!', '%' => '!%', '_' => '!_']);
-    $where[] = "EXISTS (SELECT 1 FROM mirror_categories pmc WHERE pmc.mirror_id = m.id AND pmc.category_id = ?)
-        AND LOWER(SUBSTRING_INDEX(m.url, '://', 1)) = ?
-        AND LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(m.url, '://', -1), '/', 1)) = ?
-        AND (m.url = ? OR m.url LIKE ? ESCAPE '!')";
+    $authorityExpression = "LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(m.url, '://', -1), '/', 1))";
+    $authorityPlaceholders = implode(', ', array_fill(0, count($portSuffixes), '?'));
+    $urlPrefixConditions = [];
     $params[] = (int)$providerFilter['id'];
     $params[] = $baseScheme;
-    $params[] = $baseHost . $basePort;
-    $params[] = $basePrefix;
-    $params[] = $escapedPrefix . '/%';
+    foreach ($portSuffixes as $portSuffix) $params[] = $baseHost . $portSuffix;
+    foreach ($portSuffixes as $portSuffix) {
+        $basePrefix = $baseScheme . '://' . $baseHost . $portSuffix . $basePath;
+        $escapedPrefix = strtr($basePrefix, ['!' => '!!', '%' => '!%', '_' => '!_']);
+        $urlPrefixConditions[] = '(m.url = ? OR m.url LIKE ? ESCAPE \'!\')';
+        $params[] = $basePrefix;
+        $params[] = $escapedPrefix . '/%';
+    }
+    $where[] = "EXISTS (SELECT 1 FROM mirror_categories pmc WHERE pmc.mirror_id = m.id AND pmc.category_id = ?)
+        AND LOWER(SUBSTRING_INDEX(m.url, '://', 1)) = ?
+        AND {$authorityExpression} IN ({$authorityPlaceholders})
+        AND (" . implode(' OR ', $urlPrefixConditions) . ")";
 }
 if ($status !== '') {
     $where[] = "COALESCE((SELECT fs.status FROM mirror_status fs WHERE fs.mirror_id = m.id), 'unknown') = ?";
