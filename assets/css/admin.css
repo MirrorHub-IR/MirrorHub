@@ -939,3 +939,81 @@
     .admin-layout .backup-download-actions .btn { width: 100%; }
     .admin-layout .import-zone { min-height: 118px; padding: 14px; }
 }
+
+/* MirrorHub category picker layout hardening */
+.admin-layout .mirror-editor-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+}
+.admin-layout .mirror-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+.admin-layout .mirror-category-group-label {
+    grid-column: 1 / -1;
+    min-width: 0;
+    width: 100%;
+}
+.admin-layout .mirror-category-card {
+    display: grid;
+    grid-template-columns: 21px minmax(0, 1fr);
+    align-items: center;
+    gap: .65rem;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.admin-layout .mirror-category-check { align-self: center; }
+.admin-layout .mirror-category-copy {
+    display: flex;
+    flex-direction: column;
+    gap: .18rem;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+.admin-layout .mirror-category-heading {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    width: 100%;
+    min-width: 0;
+}
+.admin-layout .mirror-category-heading .mirror-category-icon {
+    display: block;
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    max-width: 20px;
+    margin: 0;
+    object-fit: contain;
+}
+.admin-layout .mirror-category-heading strong {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.55;
+}
+.admin-layout .mirror-category-copy small {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+    .admin-layout .mirror-editor-layout { grid-template-columns: minmax(0, 1fr); }
+    .admin-layout .mirror-editor-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+    .admin-layout .mirror-category-grid { grid-template-columns: minmax(0, 1fr); }
+    .admin-layout .mirror-editor-side { grid-template-columns: minmax(0, 1fr); }
+}
