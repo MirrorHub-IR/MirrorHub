@@ -98,8 +98,8 @@ unset($mirror);
 
 $categories = $pdo->query("SELECT id, name, type FROM categories ORDER BY CASE WHEN type='software' THEN 0 ELSE 1 END, sort_order, name")->fetchAll();
 $providerCategories = array_values(array_filter(
-    $pdo->query("SELECT id, name, base_url FROM categories WHERE type = 'provider' AND base_url IS NOT NULL AND base_url <> '' ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC),
-    static fn($provider) => categoryBaseUrlIsValid((string)$provider['base_url'])
+    $pdo->query("SELECT id, name, base_url FROM categories WHERE type = 'provider' AND base_url IS NOT NULL AND TRIM(base_url) <> '' ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC),
+    static fn($provider) => trim((string)$provider['base_url']) !== '' && categoryBaseUrlIsValid((string)$provider['base_url'])
 ));
 $hasFilters = $query !== '' || $categoryId > 0 || $providerFilterId > 0 || $status !== '' || $protocol !== '';
 $GLOBALS['pageSeo'] = [
