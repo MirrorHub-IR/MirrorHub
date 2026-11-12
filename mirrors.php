@@ -6,6 +6,17 @@ require_once __DIR__ . '/includes/monitoring.php';
 
 $query = normalizeSearchQuery($_GET['q'] ?? '', 100);
 $categoryId = (isset($_GET['category_id']) && ctype_digit((string)$_GET['category_id'])) ? (int)$_GET['category_id'] : 0;
+$providerFilterId = (isset($_GET['provider_id']) && ctype_digit((string)$_GET['provider_id'])) ? (int)$_GET['provider_id'] : 0;
+$providerFilter = null;
+if ($providerFilterId > 0) {
+    $providerStmt = $pdo->prepare("SELECT id, name, base_url FROM categories WHERE id = ? AND type = 'provider' LIMIT 1");
+    $providerStmt->execute([$providerFilterId]);
+    $providerFilter = $providerStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if (!$providerFilter || !categoryBaseUrlIsValid((string)($providerFilter['base_url'] ?? '')) || trim((string)$providerFilter['base_url']) === '') {
+        $providerFilterId = 0;
+        $providerFilter = null;
+    }
+}
 $statusOptions = ['up', 'slow', 'down', 'unknown'];
 $status = in_array((string)($_GET['status'] ?? ''), $statusOptions, true) ? (string)$_GET['status'] : '';
 $protocolOptions = getProtocolOptions();
@@ -21,6 +32,24 @@ if ($query !== '') {
 if ($categoryId > 0) {
     $where[] = 'EXISTS (SELECT 1 FROM mirror_categories fmc WHERE fmc.mirror_id = m.id AND fmc.category_id = ?)';
     $params[] = $categoryId;
+}
+if ($providerFilter) {
+    $baseParts = parse_url((string)$providerFilter['base_url']);
+    $baseScheme = strtolower((string)($baseParts['scheme'] ?? ''));
+    $baseHost = strtolower((string)($baseParts['host'] ?? ''));
+    $basePort = isset($baseParts['port']) ? ':' . (int)$baseParts['port'] : '';
+    $basePath = rtrim((string)($baseParts['path'] ?? ''), '/');
+    $basePrefix = $baseScheme . '://' . $baseHost . $basePort . $basePath;
+    $escapedPrefix = strtr($basePrefix, ['!' => '!!', '%' => '!%', '_' => '!_']);
+    $where[] = "EXISTS (SELECT 1 FROM mirror_categories pmc WHERE pmc.mirror_id = m.id AND pmc.category_id = ?)
+        AND LOWER(SUBSTRING_INDEX(m.url, '://', 1)) = ?
+        AND LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(m.url, '://', -1), '/', 1)) = ?
+        AND (m.url = ? OR m.url LIKE ? ESCAPE '!')";
+    $params[] = (int)$providerFilter['id'];
+    $params[] = $baseScheme;
+    $params[] = $baseHost . $basePort;
+    $params[] = $basePrefix;
+    $params[] = $escapedPrefix . '/%';
 }
 if ($status !== '') {
     $where[] = "COALESCE((SELECT fs.status FROM mirror_status fs WHERE fs.mirror_id = m.id), 'unknown') = ?";
@@ -68,7 +97,11 @@ foreach ($mirrors as &$mirror) {
 unset($mirror);
 
 $categories = $pdo->query("SELECT id, name, type FROM categories ORDER BY CASE WHEN type='software' THEN 0 ELSE 1 END, sort_order, name")->fetchAll();
-$hasFilters = $query !== '' || $categoryId > 0 || $status !== '' || $protocol !== '';
+$providerCategories = array_values(array_filter(
+    $pdo->query("SELECT id, name, base_url FROM categories WHERE type = 'provider' AND base_url IS NOT NULL AND base_url <> '' ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC),
+    static fn($provider) => categoryBaseUrlIsValid((string)$provider['base_url'])
+));
+$hasFilters = $query !== '' || $categoryId > 0 || $providerFilterId > 0 || $status !== '' || $protocol !== '';
 $GLOBALS['pageSeo'] = [
     'title' => 'همه میرورهای نرم‌افزاری | فهرست و فیلتر MirrorHub',
     'description' => 'فهرست میرورهای فعال نرم‌افزاری را جست‌وجو و بر اساس دسته‌بندی، پروتکل و وضعیت پایش فیلتر کنید.',
@@ -91,6 +124,7 @@ renderHeader('همه میرورها');
     <form class="directory-filter card" method="get" action="<?= SITE_URL ?>/mirrors/" aria-label="فیلتر میرورها">
         <div class="directory-filter-search"><label for="mirror-query">جست‌وجوی میرور</label><input id="mirror-query" type="search" name="q" value="<?= htmlspecialchars($query, ENT_QUOTES, 'UTF-8') ?>" placeholder="نام، توضیح یا نشانی میرور..." autocomplete="off"></div>
         <div><label for="mirror-category">دسته‌بندی</label><select id="mirror-category" name="category_id"><option value="0">همهٔ دسته‌ها</option><?php foreach ($categories as $category): ?><option value="<?= (int)$category['id'] ?>" <?= $categoryId === (int)$category['id'] ? 'selected' : '' ?>><?= htmlspecialchars(($category['type'] === 'provider' ? 'ارائه‌دهنده · ' : 'نرم‌افزار · ') . $category['name'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select></div>
+        <div><label for="mirror-provider">ارائه‌دهنده (بر اساس Base URL)</label><select id="mirror-provider" name="provider_id"><option value="0">همهٔ ارائه‌دهندگان</option><?php foreach ($providerCategories as $provider): ?><option value="<?= (int)$provider['id'] ?>" <?= $providerFilterId === (int)$provider['id'] ? 'selected' : '' ?>><?= htmlspecialchars($provider['name'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></select></div>
         <div><label for="mirror-status">وضعیت پایش</label><select id="mirror-status" name="status"><option value="">همه وضعیت‌ها</option><option value="up" <?= $status === 'up' ? 'selected' : '' ?>>آنلاین</option><option value="slow" <?= $status === 'slow' ? 'selected' : '' ?>>کند</option><option value="down" <?= $status === 'down' ? 'selected' : '' ?>>قطع</option><option value="unknown" <?= $status === 'unknown' ? 'selected' : '' ?>>بررسی‌نشده</option></select></div>
         <div><label for="mirror-protocol">پروتکل</label><select id="mirror-protocol" name="protocol"><option value="">همهٔ پروتکل‌ها</option><?php foreach ($protocolOptions as $key => $label): ?><option value="<?= htmlspecialchars($key) ?>" <?= $protocol === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?></select></div>
         <div class="directory-filter-actions"><button class="btn btn-primary" type="submit"><?= icon('search', 15) ?> اعمال فیلتر</button><a class="btn btn-outline" href="<?= SITE_URL ?>/mirrors/">پاک‌کردن</a></div>
@@ -104,13 +138,13 @@ renderHeader('همه میرورها');
         <div class="grid grid-cols-2">
             <?php foreach ($mirrors as $mirror): $names = mirrorDisplayName($mirror); ?>
             <article class="card mirror-card">
-                <div class="mirror-header"><div class="mirror-titles"><h3><a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>"><?= htmlspecialchars($names['fa'], ENT_QUOTES, 'UTF-8') ?></a></h3><?php if ($names['en'] && $names['en'] !== $names['fa']): ?><span class="mirror-name-en"><?= htmlspecialchars($names['en'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?></div><div class="mirror-actions"><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>">جزئیات</a><a class="btn btn-sm btn-primary" href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">بازکردن</a></div></div>
+                <div class="mirror-header"><div class="mirror-titles"><h3><a href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>"><?= htmlspecialchars($names['fa'], ENT_QUOTES, 'UTF-8') ?></a></h3><?php if ($names['en'] && $names['en'] !== $names['fa']): ?><span class="mirror-name-en"><?= htmlspecialchars($names['en'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?></div><div class="mirror-actions"><a class="btn btn-sm btn-outline" href="<?= SITE_URL ?>/mirror.php?slug=<?= rawurlencode((string)$mirror['slug']) ?>">جزئیات</a><a class="btn btn-sm btn-primary" href="<?= htmlspecialchars($mirror['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">بازکردن</a><?= pingButton($mirror['url']) ?></div></div>
                 <?php if (!empty($mirror['description'])): ?><p class="mirror-desc"><?= htmlspecialchars(excerpt($mirror['description'], 130), ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
                 <div class="mirror-meta"><?= monitorCardBadge($monitorStatuses[$mirror['id']] ?? null) ?><?= protocolBadges($mirror['protocols']) ?><?php foreach ($mirror['categories'] as $category): ?><a class="badge badge-primary" href="<?= SITE_URL ?>/category.php?slug=<?= rawurlencode((string)$category['slug']) ?>"><?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?></a><?php endforeach; ?></div>
             </article>
             <?php endforeach; ?>
         </div>
-        <?php if ($totalPages > 1): $queryParams = array_filter(['q' => $query, 'category_id' => $categoryId ?: null, 'status' => $status, 'protocol' => $protocol], static fn($value) => $value !== null && $value !== ''); ?>
+        <?php if ($totalPages > 1): $queryParams = array_filter(['q' => $query, 'category_id' => $categoryId ?: null, 'provider_id' => $providerFilterId ?: null, 'status' => $status, 'protocol' => $protocol], static fn($value) => $value !== null && $value !== ''); ?>
         <nav class="directory-pagination" aria-label="صفحه‌بندی میرورها">
             <?php if ($page > 1): ?><a class="btn btn-outline" href="<?= SITE_URL ?>/mirrors/?<?= htmlspecialchars(http_build_query($queryParams + ['page' => $page - 1]), ENT_QUOTES, 'UTF-8') ?>">صفحهٔ قبل</a><?php endif; ?>
             <span>صفحهٔ <?= number_format($page) ?> از <?= number_format($totalPages) ?></span>

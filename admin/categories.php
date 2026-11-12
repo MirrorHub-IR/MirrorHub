@@ -195,7 +195,7 @@ renderHeader('مدیریت دسته‌بندی‌ها', true);
                 <div class="form-group">
                     <label for="base_url">نشانی پایه (Base URL) — اختیاری</label>
                     <input type="url" id="base_url" name="base_url" value="<?= htmlspecialchars((string)($currentCat['base_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" dir="ltr" maxlength="1000" placeholder="https://mirror.example.org/repository">
-                    <small class="form-hint">نشانی پایهٔ رسمی یا ریشهٔ مخزن این دسته. فقط URL کامل با http یا https پذیرفته می‌شود؛ این مقدار از پروتکل ثبت‌شده در متادیتا جداست.</small>
+                    <small class="form-hint">برای دستهٔ ارائه‌دهنده، نشانی ریشه را کامل و با http:// یا https:// وارد کنید؛ صفحه و فیلتر ارائه‌دهنده فقط URLهای منطبق با scheme، میزبان، پورت و مسیر این Base URL را نشان می‌دهند. در دستهٔ نرم‌افزار این فیلتر اعمال نمی‌شود. این مقدار از پروتکل ثبت‌شدهٔ میرور جداست.</small>
                 </div>
                 <div class="form-group">
                     <label for="icon">آیکون دسته‌بندی (اختیاری)</label>

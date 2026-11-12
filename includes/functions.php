@@ -410,6 +410,25 @@ function categoryBaseUrlIsValid(string $url): bool {
     return filter_var($url, FILTER_VALIDATE_URL) !== false;
 }
 
+/** Match a provider mirror URL to the provider's HTTP(S) base origin and path. */
+function providerUrlMatchesBaseUrl(string $url, string $baseUrl): bool {
+    if (!categoryBaseUrlIsValid($baseUrl) || !filter_var($url, FILTER_VALIDATE_URL)) return false;
+    $mirror = parse_url(trim($url));
+    $base = parse_url(trim($baseUrl));
+    if (!is_array($mirror) || !is_array($base)) return false;
+    $scheme = strtolower((string)($mirror['scheme'] ?? ''));
+    $baseScheme = strtolower((string)($base['scheme'] ?? ''));
+    if (!in_array($scheme, ['http', 'https'], true) || $scheme !== $baseScheme) return false;
+    if (strtolower((string)($mirror['host'] ?? '')) !== strtolower((string)($base['host'] ?? ''))) return false;
+    $defaultPort = $scheme === 'https' ? 443 : 80;
+    if ((int)($mirror['port'] ?? $defaultPort) !== (int)($base['port'] ?? $defaultPort)) return false;
+    if (isset($mirror['user']) || isset($mirror['pass'])) return false;
+    $mirrorPath = rtrim((string)($mirror['path'] ?? ''), '/');
+    $basePath = rtrim((string)($base['path'] ?? ''), '/');
+    if ($basePath === '') return true;
+    return $mirrorPath === $basePath || str_starts_with($mirrorPath, $basePath . '/');
+}
+
 function uploadCategoryIcon($file, $oldIcon = null) {
     $uploadDir = __DIR__ . '/../uploads/category-icons/';
     if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {

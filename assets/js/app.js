@@ -396,17 +396,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const showFile = file => {
-            if (!file || !file.name.toLowerCase().endsWith('.json')) {
+            const extension = file && file.name ? file.name.toLowerCase().split('.').pop() : '';
+            if (!file || !['json', 'zip'].includes(extension)) {
                 backupFile.value = '';
                 if (backupFilePill) backupFilePill.classList.remove('active');
-                showAlert('فقط فایل JSON پذیرفته می‌شود.', 'warning', 'فرمت نامعتبر');
+                showAlert('فقط فایل پشتیبان با فرمت JSON یا ZIP پذیرفته می‌شود.', 'warning', 'فرمت نامعتبر');
                 syncState();
                 return;
             }
-            if (file.size > 25 * 1024 * 1024) {
+            if (file.size > 100 * 1024 * 1024) {
                 backupFile.value = '';
                 if (backupFilePill) backupFilePill.classList.remove('active');
-                showAlert('حجم فایل نباید بیشتر از ۲۵ مگابایت باشد.', 'warning', 'فایل بزرگ است');
+                showAlert('حجم فایل پشتیبان نباید بیشتر از ۱۰۰ مگابایت باشد.', 'warning', 'فایل بزرگ است');
                 syncState();
                 return;
             }

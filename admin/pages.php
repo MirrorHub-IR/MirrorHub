@@ -53,9 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (mb_strlen($article['title']) > 200) $errors[] = 'عنوان حداکثر ۲۰۰ نویسه باشد.';
     if (mb_strlen($article['seo_description']) > 320) $errors[] = 'توضیحات SEO حداکثر ۳۲۰ نویسه باشد.';
     if ($article['category_id']) {
-        $q=$pdo->prepare("SELECT id FROM categories WHERE id=? AND type='software'");
+        $q=$pdo->prepare("SELECT id FROM categories WHERE id=? AND type IN ('software','provider')");
         $q->execute([$article['category_id']]);
-        if (!$q->fetch()) $errors[] = 'دسته‌بندی نرم‌افزار معتبر نیست.';
+        if (!$q->fetch()) $errors[] = 'دسته‌بندی انتخاب‌شده معتبر نیست.';
     }
     $q=$pdo->prepare("SELECT id FROM cms_articles WHERE slug=? AND id<>?");
     $q->execute([$article['slug'],$id]);
@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$row) { flash('error','مقاله پیدا نشد.'); redirect(SITE_URL.'/admin/pages.php'); }
     $article=$row;
 }
-$categories=$pdo->query("SELECT id,name FROM categories WHERE type='software' ORDER BY sort_order,name")->fetchAll();
+$categories=$pdo->query("SELECT id,name,type FROM categories WHERE type IN ('software','provider') ORDER BY CASE WHEN type='software' THEN 0 ELSE 1 END,sort_order,name")->fetchAll();
 $articles=$pdo->query("SELECT a.id,a.title,a.slug,a.status,a.updated_at,c.name AS category_name FROM cms_articles a LEFT JOIN categories c ON c.id=a.category_id ORDER BY a.updated_at DESC")->fetchAll();
 renderHeader('مدیریت راهنماها', true);
 ?>
@@ -95,7 +95,7 @@ renderHeader('مدیریت راهنماها', true);
 <div class="cms-form-grid">
 <label>عنوان مقاله<input name="title" maxlength="200" required value="<?= htmlspecialchars((string)$article['title']) ?>"></label>
 <label>نامک URL<input name="slug" maxlength="190" value="<?= htmlspecialchars((string)$article['slug']) ?>" placeholder="alpine-repositories"></label>
-<label>راهنمای مربوط به کدام دسته است؟<select name="category_id"><option value="0">بدون اتصال به دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option><?php endforeach; ?></select><small class="form-hint">بعد از انتشار، لینک این راهنما در صفحهٔ همان دستهٔ نرم‌افزاری نمایش داده می‌شود؛ مثلاً دستهٔ Ubuntu.</small></label>
+<label>راهنمای مربوط به کدام دسته است؟<select name="category_id"><option value="0">بدون اتصال به دسته</option><?php foreach($categories as $cat): ?><option value="<?= (int)$cat['id'] ?>" <?= (int)($article['category_id'] ?? 0)===(int)$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?> — <?= ($cat['type'] ?? '') === 'provider' ? 'ارائه‌دهنده' : 'نرم‌افزار' ?></option><?php endforeach; ?></select><small class="form-hint">پس از انتشار، لینک راهنما در صفحهٔ دستهٔ انتخاب‌شده نمایش داده می‌شود؛ این قابلیت برای دسته‌های نرم‌افزار و ارائه‌دهنده فعال است.</small></label>
 <label>وضعیت انتشار<select name="status"><option value="draft" <?= $article['status']==='draft'?'selected':'' ?>>پیش‌نویس</option><option value="published" <?= $article['status']==='published'?'selected':'' ?>>منتشرشده</option></select></label>
 </div>
 <label>خلاصه<textarea name="excerpt" rows="2" maxlength="500"><?= htmlspecialchars((string)($article['excerpt'] ?? '')) ?></textarea></label>

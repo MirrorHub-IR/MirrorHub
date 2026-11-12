@@ -8,7 +8,7 @@ ensureCategoryBaseUrlSchema($pdo);
 require_once __DIR__ . '/../includes/donate.php';
 ensureDonateSchema($pdo);
 
-const MIRRORHUB_BACKUP_VERSION = 5;
+const MIRRORHUB_BACKUP_VERSION = 6;
 $backupTables = [
     'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
     'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
@@ -87,9 +87,11 @@ function backupNormalizeUploadPath(string $path): string {
             throw new RuntimeException('مسیر فایل آپلودی در پشتیبان نامعتبر است.');
         }
     }
+    $basename = strtolower((string)basename($path));
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    if (in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
-        throw new RuntimeException('بازیابی فایل اجرایی از مسیر آپلود مجاز نیست.');
+    if (in_array($basename, ['.htaccess', '.user.ini', 'web.config'], true)
+        || in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
+        throw new RuntimeException('بازیابی فایل اجرایی یا پیکربندی سرور از مسیر آپلود مجاز نیست.');
     }
     return implode('/', $parts);
 }
@@ -182,6 +184,45 @@ function backupValidateUploadFiles($entries): array {
     return $decoded;
 }
 
+/** Validate the ZIP manifest and read only the explicitly listed uploads entries. No archive path is ever extracted directly. */
+function backupValidateZipUploadFiles(ZipArchive $zip, $entries): array {
+    if (!is_array($entries)) throw new RuntimeException('فهرست فایل‌های ZIP نامعتبر است.');
+    if (count($entries) > 1000) throw new RuntimeException('تعداد فایل‌های ZIP بیش از حد مجاز است.');
+    $decoded = [];
+    $totalBytes = 0;
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) throw new RuntimeException('ساختار یکی از فایل‌های ZIP نامعتبر است.');
+        $path = backupNormalizeUploadPath((string)($entry['path'] ?? ''));
+        if (array_key_exists($path, $decoded)) throw new RuntimeException('مسیر تکراری در فایل ZIP وجود دارد.');
+        $expectedSize = filter_var($entry['size'] ?? null, FILTER_VALIDATE_INT);
+        if ($expectedSize === false || $expectedSize < 0 || $expectedSize > 10 * 1024 * 1024) {
+            throw new RuntimeException('اندازهٔ اعلام‌شدهٔ فایل ZIP نامعتبر است.');
+        }
+        $totalBytes += $expectedSize;
+        if ($totalBytes > 64 * 1024 * 1024) throw new RuntimeException('حجم مجموع فایل‌های ZIP بیش از ۶۴ مگابایت است.');
+        $archiveName = 'uploads/' . $path;
+        $stat = $zip->statName($archiveName);
+        if (!is_array($stat) || (int)($stat['size'] ?? -1) !== $expectedSize) {
+            throw new RuntimeException('یکی از فایل‌های ZIP وجود ندارد یا اندازهٔ آن با manifest مطابقت ندارد.');
+        }
+        $content = $zip->getFromName($archiveName);
+        if ($content === false || strlen($content) !== $expectedSize) {
+            throw new RuntimeException('خواندن یکی از فایل‌های ZIP ناموفق بود.');
+        }
+        $sha256 = strtolower((string)($entry['sha256'] ?? ''));
+        if (!preg_match('/^[a-f0-9]{64}$/', $sha256) || !hash_equals($sha256, hash('sha256', $content))) {
+            throw new RuntimeException('امضای SHA-256 یکی از فایل‌های ZIP درست نیست.');
+        }
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            $safeSvg = function_exists('sanitizeCategorySvg') ? sanitizeCategorySvg($content) : false;
+            if ($safeSvg === false) throw new RuntimeException('فایل SVG در ZIP ناامن یا نامعتبر است.');
+            $content = $safeSvg;
+        }
+        $decoded[$path] = $content;
+    }
+    return $decoded;
+}
+
 /** Restore validated upload files atomically below /uploads; existing files are replaced by archive copies. */
 function backupRestoreUploadFiles(array $files): int {
     if (!$files) return 0;
@@ -235,6 +276,15 @@ function mappedId(array $map, $oldId, string $label): ?int {
 }
 
 if (($_GET['action'] ?? '') === 'export') {
+    $exportFormat = strtolower((string)($_GET['format'] ?? 'json'));
+    if (!in_array($exportFormat, ['json', 'zip'], true)) {
+        flash('error', 'فرمت خروجی پشتیبان نامعتبر است.');
+        redirect(SITE_URL . '/admin/backup.php');
+    }
+    if ($exportFormat === 'zip' && !class_exists('ZipArchive')) {
+        flash('error', 'برای خروجی ZIP، افزونهٔ PHP ZipArchive باید روی هاست فعال باشد. خروجی JSON همچنان در دسترس است.');
+        redirect(SITE_URL . '/admin/backup.php');
+    }
     try {
         $uploadArchive = backupCollectUploadFiles();
     } catch (Throwable $uploadError) {
@@ -246,6 +296,7 @@ if (($_GET['action'] ?? '') === 'export') {
         'version' => MIRRORHUB_BACKUP_VERSION,
         'exported_at' => date('c'),
         'site' => SITE_NAME,
+        'file_storage' => $exportFormat,
         'tables' => [],
         'files' => $uploadArchive,
     ];
@@ -270,6 +321,49 @@ if (($_GET['action'] ?? '') === 'export') {
         throw $exportError;
     }
 
+    if ($exportFormat === 'zip') {
+        $temporaryZip = tempnam(sys_get_temp_dir(), 'mh-backup-');
+        if ($temporaryZip === false) throw new RuntimeException('ساخت فایل موقت ZIP ناموفق بود.');
+        try {
+            $zip = new ZipArchive();
+            $openResult = $zip->open($temporaryZip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            if ($openResult !== true) throw new RuntimeException('ساخت آرشیو ZIP ناموفق بود.');
+            $zipOpen = true;
+            try {
+                $zipPayload = $payload;
+                $zipPayload['files'] = [];
+                foreach ($uploadArchive as $fileEntry) {
+                    $zipPayload['files'][] = [
+                        'path' => $fileEntry['path'],
+                        'size' => $fileEntry['size'],
+                        'sha256' => $fileEntry['sha256'],
+                    ];
+                }
+                $zipJson = json_encode($zipPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                if (!$zip->addFromString('backup.json', $zipJson)) throw new RuntimeException('افزودن manifest به ZIP ناموفق بود.');
+                foreach ($uploadArchive as $fileEntry) {
+                    $content = base64_decode((string)$fileEntry['content_base64'], true);
+                    if ($content === false || !$zip->addFromString('uploads/' . $fileEntry['path'], $content)) {
+                        throw new RuntimeException('افزودن یکی از فایل‌های آپلودی به ZIP ناموفق بود.');
+                    }
+                }
+                if (!$zip->close()) throw new RuntimeException('نهایی‌سازی آرشیو ZIP ناموفق بود.');
+                $zipOpen = false;
+            } finally {
+                if ($zipOpen) $zip->close();
+            }
+            $filename = 'mirrorhub-backup-' . date('Ymd-His') . '.zip';
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($temporaryZip));
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            readfile($temporaryZip);
+        } finally {
+            if (is_file($temporaryZip)) @unlink($temporaryZip);
+        }
+        exit;
+    }
+
     $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     $filename = 'mirrorhub-backup-' . date('Ymd-His') . '.json';
     header('Content-Type: application/json; charset=utf-8');
@@ -292,36 +386,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         redirect(SITE_URL . '/admin/backup.php');
     }
 
-    if (!isset($_FILES['backup_file']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
-        flash('error', 'فایل JSON معتبر انتخاب کنید.');
+    $file = $_FILES['backup_file'] ?? null;
+    if (!is_array($file) || (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $uploadMessage = $uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE
+            ? 'فایل از محدودیت حجم آپلود PHP بزرگ‌تر است.'
+            : 'فایل JSON یا ZIP معتبر انتخاب کنید.';
+        flash('error', $uploadMessage);
         redirect(SITE_URL . '/admin/backup.php');
     }
-
-    $file = $_FILES['backup_file'];
-    if (($file['size'] ?? 0) > 25 * 1024 * 1024) {
+    if ((int)($file['size'] ?? 0) > 100 * 1024 * 1024) {
         flash('error', 'حجم فایل پشتیبان نباید بیشتر از ۱۰۰ مگابایت باشد.');
         redirect(SITE_URL . '/admin/backup.php');
     }
-    if (strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION)) !== 'json') {
-        flash('error', 'فقط فایل با پسوند JSON پذیرفته می‌شود.');
+    $fileExtension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($fileExtension, ['json', 'zip'], true)) {
+        flash('error', 'فقط فایل پشتیبان با پسوند JSON یا ZIP پذیرفته می‌شود.');
         redirect(SITE_URL . '/admin/backup.php');
     }
 
-    $raw = file_get_contents($file['tmp_name']);
-    if ($raw === false || trim($raw) === '') {
-        flash('error', 'فایل پشتیبان خالی یا غیرقابل خواندن است.');
-        redirect(SITE_URL . '/admin/backup.php');
-    }
-
+    $zipArchive = null;
     try {
+        if ($fileExtension === 'zip') {
+            if (!class_exists('ZipArchive')) throw new RuntimeException('برای بازیابی ZIP، افزونهٔ PHP ZipArchive باید روی هاست فعال باشد.');
+            $zipArchive = new ZipArchive();
+            if ($zipArchive->open((string)$file['tmp_name']) !== true) throw new RuntimeException('فایل ZIP خراب یا غیرقابل خواندن است.');
+            $manifestStat = $zipArchive->statName('backup.json');
+            if (!is_array($manifestStat) || (int)($manifestStat['size'] ?? 0) > 100 * 1024 * 1024) {
+                throw new RuntimeException('فایل backup.json در آرشیو ZIP وجود ندارد یا بیش از حد بزرگ است.');
+            }
+            $raw = $zipArchive->getFromName('backup.json');
+        } else {
+            $raw = file_get_contents((string)$file['tmp_name']);
+        }
+        if ($raw === false || trim($raw) === '') throw new RuntimeException('فایل پشتیبان خالی یا غیرقابل خواندن است.');
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        unset($raw);
         $backupVersion = (int)($backup['version'] ?? 0);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, 4, MIRRORHUB_BACKUP_VERSION], true)) {
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, 4, 5, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
         if ($backupVersion >= 5 && !isset($backup['files'])) throw new RuntimeException('فهرست فایل‌های آپلودی در پشتیبان نسخهٔ ۵ وجود ندارد.');
-        $restorableUploadFiles = backupValidateUploadFiles($backup['files'] ?? []);
+        if ($fileExtension === 'zip') {
+            if (($backup['file_storage'] ?? '') !== 'zip' || $backupVersion < 6) {
+                throw new RuntimeException('ساختار فایل ZIP پشتیبان با نسخهٔ فعلی سازگار نیست.');
+            }
+            $restorableUploadFiles = backupValidateZipUploadFiles($zipArchive, $backup['files'] ?? []);
+            $zipArchive->close();
+            $zipArchive = null;
+        } else {
+            if (($backup['file_storage'] ?? 'json') !== 'json') {
+                throw new RuntimeException('نوع ذخیره‌سازی فایل‌های پشتیبان با پسوند JSON مطابقت ندارد.');
+            }
+            $restorableUploadFiles = backupValidateUploadFiles($backup['files'] ?? []);
+        }
         $restoredUploadCount = 0;
 
         $legacyMissingTables = [];
@@ -566,6 +685,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
             flash('success', 'داده‌های پشتیبان با حفظ اطلاعات فعلی اضافه شد. فایل‌های آپلودی بازیابی‌شده: ' . $restoredUploadCount . ' عدد.');
         }
     } catch (Throwable $e) {
+        if ($zipArchive instanceof ZipArchive) {
+            $zipArchive->close();
+            $zipArchive = null;
+        }
         if ($pdo->inTransaction()) {
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
             $pdo->rollBack();
@@ -585,30 +708,30 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
         <div>
             <span class="eyebrow">MirrorHub • Data Safety</span>
             <h1 class="section-title">پشتیبان‌گیری و بازیابی</h1>
-            <p class="section-desc">از تمام داده‌های MirrorHub یک فایل JSON نسخه‌دار بسازید یا همان ساختار را دوباره وارد کنید.</p>
+            <p class="section-desc">از پایگاه داده و فایل‌های آپلودی خروجی JSON یا ZIP تهیه کنید و همان پشتیبان را با اعتبارسنجی مسیر و هش بازیابی کنید.</p>
         </div>
     </div>
 
     <div class="alert alert-warning" role="note">
-        فایل پشتیبان شامل همهٔ جدول‌های پایگاه داده و فایل‌های موجود در پوشهٔ uploads (از جمله آیکون دسته‌بندی‌ها) است. سقف هر فایل ۱۰ و مجموع فایل‌ها ۶۴ مگابایت است. فایل پشتیبان ممکن است حاوی توکن‌ها و تنظیمات خصوصی باشد؛ آن را محرمانه نگه دارید و پیش از بازیابی نسخهٔ جداگانه تهیه کنید.
+        فایل پشتیبان شامل همهٔ جدول‌های دیتابیس و فایل‌های مجاز پوشهٔ uploads است؛ سقف هر فایل ۱۰ مگابایت، مجموع فایل‌ها ۶۴ مگابایت و حداکثر تعداد ۱۰۰۰ فایل است. خروجی JSON محتوای فایل‌ها را Base64 می‌کند؛ ZIP فایل‌ها را به‌صورت مستقل نگه می‌دارد. برای ZIP افزونهٔ PHP ZipArchive لازم است. این پشتیبان ممکن است حاوی توکن‌ها و تنظیمات خصوصی باشد؛ آن را محرمانه نگه دارید و پیش از بازیابی نسخهٔ جداگانه تهیه کنید.
     </div>
 
     <div class="backup-actions-grid">
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('database', 21) ?></span>
-                <div><h2>خروجی داده‌ها</h2><p>جدول‌های پایگاه داده و فایل‌های آپلودشدهٔ پوشهٔ uploads داخل یک JSON نسخه‌دار ذخیره می‌شوند.</p></div>
+                <div><h2>خروجی داده‌ها</h2><p>خروجی JSON قابل‌حمل یا ZIP با فایل‌های باینری مستقل؛ هر دو شامل جدول‌های پایگاه داده و فایل‌های مجاز پوشهٔ uploads هستند.</p></div>
             </div>
-            <a href="<?= SITE_URL ?>/admin/backup.php?action=export" class="btn btn-primary backup-download">دانلود فایل پشتیبان</a>
+            <div class="backup-download-actions"><a href="<?= SITE_URL ?>/admin/backup.php?action=export&amp;format=json" class="btn btn-primary">دانلود JSON</a><?php if (class_exists('ZipArchive')): ?><a href="<?= SITE_URL ?>/admin/backup.php?action=export&amp;format=zip" class="btn btn-outline">دانلود ZIP</a><?php else: ?><small class="form-hint">برای فعال‌شدن خروجی ZIP، افزونهٔ PHP ZipArchive را روی هاست فعال کنید.</small><?php endif; ?></div>
             <div class="backup-meta">
-                <span class="badge badge-default">JSON</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">شامل روابط، پروتکل‌ها و آپلودها</span>
+                <span class="badge badge-default">JSON + ZIP</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">داده‌ها + فایل‌ها + SHA-256</span>
             </div>
         </div>
 
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('inbox', 21) ?></span>
-                <div><h2>ورودی داده‌ها</h2><p>فایل JSON را انتخاب کنید، بکشید و رها کنید یا پس از تمرکز روی ناحیه با Ctrl+V بچسبانید.</p></div>
+                <div><h2>ورودی داده‌ها</h2><p>فایل JSON یا ZIP را انتخاب کنید، بکشید و رها کنید؛ در صورت پشتیبانی مرورگر، فایل یا تصویر کپی‌شده را پس از تمرکز روی ناحیه با Ctrl+V وارد کنید.</p></div>
             </div>
 
             <form action="<?= SITE_URL ?>/admin/backup.php" method="POST" enctype="multipart/form-data" id="backup-import-form">
@@ -616,17 +739,17 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
                 <input type="hidden" name="backup_action" value="import">
 
                 <label class="import-zone" id="backup-dropzone" data-upload-zone for="backup-file">
-                    <input type="file" id="backup-file" name="backup_file" accept=".json,application/json" required>
+                    <input type="file" id="backup-file" name="backup_file" accept=".json,.zip,application/json,application/zip" required>
                     <div>
                         <div class="import-zone-icon"><?= icon('inbox', 25) ?></div>
-                        <strong>فایل JSON را اینجا رها کنید</strong>
-                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت</span>
+                        <strong>فایل JSON یا ZIP را اینجا رها کنید</strong>
+                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت، تابع محدودیت‌های هاست</span>
                     </div>
                 </label>
 
                 <div class="file-pill" id="backup-file-pill">
                     <div class="file-pill-main"><span><?= icon('check', 15) ?></span><strong id="backup-file-name">فایل انتخاب شد</strong><span id="backup-file-size"></span></div>
-                    <span class="badge badge-success">JSON</span>
+                    <span class="badge badge-success">JSON / ZIP</span>
                 </div>
 
                 <div class="import-options">

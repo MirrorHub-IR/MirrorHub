@@ -185,6 +185,13 @@
 
             setState(button, 'ping-' + level.key, faNum(ms) + ' ms');
             button.title = successTitle(target, ms, level, result.status);
+        }).catch(function () {
+            // A missing Fetch/AbortController implementation or an unexpected
+            // browser exception must not leave the button permanently busy.
+            button.dataset.pingBusy = '0';
+            button.removeAttribute('aria-busy');
+            setState(button, 'ping-fail', 'خطا');
+            button.title = 'مرورگر نتوانست درخواست اندازه‌گیری را اجرا کند. پشتیبانی Fetch، محدودیت CSP و تنظیمات شبکه را بررسی کنید.\n' + target.href;
         });
     }
 

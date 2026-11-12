@@ -853,3 +853,89 @@
     .admin-layout .mh-file-upload-zone { padding:13px; }
     .admin-layout .mh-file-upload-zone input[type="file"] { font-size:.75rem; }
 }
+
+/* MirrorHub admin responsive hardening */
+.admin-layout, .admin-app, .admin-workspace, .admin-content { width: 100%; max-width: 100%; min-width: 0; }
+.admin-layout { overflow-x: clip; }
+.admin-layout img, .admin-layout video, .admin-layout canvas, .admin-layout iframe, .admin-layout svg { max-width: 100%; }
+.admin-layout .admin-content > *, .admin-layout .section, .admin-layout .card,
+.admin-layout .form-container, .admin-layout .editor-grid > *,
+.admin-layout .editor-grid-2 > *, .admin-layout .admin-guide-card,
+.admin-layout .backup-card, .admin-layout .mirror-editor-layout,
+.admin-layout .mirror-editor-main, .admin-layout .mirror-editor-side,
+.admin-layout .mirror-editor-card, .admin-layout .cms-editor-form { min-width: 0; max-width: 100%; }
+.admin-layout p, .admin-layout li, .admin-layout small, .admin-layout label,
+.admin-layout code, .admin-layout pre, .admin-layout .form-hint,
+.admin-layout .admin-guide-note { overflow-wrap: anywhere; }
+.admin-layout input, .admin-layout select, .admin-layout textarea, .admin-layout button { max-width: 100%; }
+.admin-layout input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-layout select, .admin-layout textarea { min-width: 0; }
+.admin-layout .table-responsive, .admin-layout .table-container {
+    width: 100%; max-width: 100%; overflow-x: auto;
+    overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch;
+}
+.admin-layout .table-responsive table, .admin-layout .table-container table { min-width: 620px; }
+.admin-layout .mirror-form-page, .admin-layout .mirror-form-shell,
+.admin-layout .mirror-editor-form { width: 100%; max-width: 100%; }
+.admin-layout .mirror-editor-layout { grid-template-columns: minmax(0, 1fr) minmax(230px, 300px); gap: clamp(.75rem, 2vw, 1.1rem); }
+.admin-layout .mirror-editor-main { display: grid; gap: 1rem; }
+.admin-layout .mirror-field-grid, .admin-layout .mirror-category-grid,
+.admin-layout .mirror-protocol-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.admin-layout .mirror-field-grid > *, .admin-layout .mirror-category-grid > *,
+.admin-layout .mirror-protocol-grid > * { min-width: 0; }
+.admin-layout .mirror-url-field, .admin-layout .mirror-input-prefix { display: flex; min-width: 0; max-width: 100%; }
+.admin-layout .mirror-url-field input, .admin-layout .mirror-input-prefix input { width: 100%; min-width: 0; }
+.admin-layout .mirror-submit-bar, .admin-layout .mirror-actions, .admin-layout .cms-actions,
+.admin-layout .editor-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
+.admin-layout .backup-actions-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.admin-layout .backup-card { overflow-wrap: anywhere; }
+.admin-layout .import-zone, .admin-layout .mh-upload-zone { max-width: 100%; min-width: 0; }
+.admin-layout .admin-guide-quick-nav { max-width: 100%; }
+@media (max-width: 1100px) {
+    .admin-layout .mirror-editor-layout { grid-template-columns: minmax(0,1fr); }
+    .admin-layout .mirror-editor-side { position: static; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .admin-layout .backup-actions-grid { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 900px) {
+    .admin-layout .admin-workspace, .admin-layout .admin-content { min-width: 0; width: 100%; }
+    .admin-layout .admin-content { padding-inline: clamp(12px, 3vw, 20px) !important; }
+    .admin-layout .mirror-editor-layout { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 620px) {
+    .admin-layout .mirror-field-grid, .admin-layout .mirror-category-grid,
+    .admin-layout .mirror-protocol-grid, .admin-layout .mirror-editor-side,
+    .admin-layout .editor-grid, .admin-layout .editor-grid-2,
+    .admin-layout .cms-form-grid { grid-template-columns: minmax(0,1fr); }
+    .admin-layout .mirror-editor-card { padding: 13px; }
+    .admin-layout .mirror-card-head { align-items: flex-start; flex-wrap: wrap; }
+    .admin-layout .mirror-submit-bar { align-items: stretch; flex-direction: column; }
+    .admin-layout .mirror-submit-bar .btn, .admin-layout .cms-actions .btn,
+    .admin-layout .editor-actions .btn { width: 100%; justify-content: center; }
+    .admin-layout .backup-card { padding: 14px; }
+    .admin-layout .import-options, .admin-layout .restore-modes { grid-template-columns: minmax(0,1fr); }
+    .admin-layout .admin-topbar { gap: 8px; }
+    .admin-layout .admin-topbar-actions { min-width: 0; }
+}
+@media (max-width: 380px) {
+    .admin-layout .admin-content { padding-inline: 10px !important; }
+    .admin-layout .section-header > .btn { width: 100%; justify-content: center; }
+    .admin-layout .admin-topbar-title strong { max-width: 42vw; }
+}
+
+/* Backup export actions and focused upload states */
+.admin-layout .backup-download-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.admin-layout .backup-download-actions .btn { min-width: 130px; justify-content: center; }
+.admin-layout .backup-download-actions .form-hint { flex: 1 1 100%; }
+.admin-layout .import-zone { min-height: 138px; }
+.admin-layout .import-zone.is-dragging, .admin-layout .import-zone.dragover,
+.admin-layout .mh-upload-zone.is-dragging {
+    outline: 2px dashed var(--admin-accent);
+    outline-offset: 3px;
+    border-color: var(--admin-accent);
+    background: rgba(169,217,108,.09);
+}
+@media (max-width: 620px) {
+    .admin-layout .backup-download-actions { display: grid; grid-template-columns: minmax(0,1fr); }
+    .admin-layout .backup-download-actions .btn { width: 100%; }
+    .admin-layout .import-zone { min-height: 118px; padding: 14px; }
+}

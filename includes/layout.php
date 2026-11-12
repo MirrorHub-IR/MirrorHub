@@ -286,7 +286,7 @@ function renderFooter() {
     <?php
         $adminInteractionPages = ['categories.php', 'mirrors.php', 'pages.php', 'monitor.php', 'requests.php', 'backup.php', 'users.php'];
         $needsAdminInteractions = $adminRoute && in_array($scriptName, $adminInteractionPages, true);
-        $needsPing = !$adminRoute && in_array($scriptName, ['index.php', 'search.php', 'category.php'], true);
+        $needsPing = !$adminRoute && in_array($scriptName, ['index.php', 'search.php', 'category.php', 'mirror.php', 'mirrors.php'], true);
     ?>
     <script>window.MH_SITE_URL = <?= json_encode(SITE_URL, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
     <script src="<?= asset('js/site.js') ?>" defer></script>
