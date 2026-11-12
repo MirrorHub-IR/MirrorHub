@@ -276,6 +276,15 @@ function mappedId(array $map, $oldId, string $label): ?int {
 }
 
 if (($_GET['action'] ?? '') === 'export') {
+    $exportFormat = strtolower((string)($_GET['format'] ?? 'json'));
+    if (!in_array($exportFormat, ['json', 'zip'], true)) {
+        flash('error', 'فرمت خروجی پشتیبان نامعتبر است.');
+        redirect(SITE_URL . '/admin/backup.php');
+    }
+    if ($exportFormat === 'zip' && !class_exists('ZipArchive')) {
+        flash('error', 'برای خروجی ZIP، افزونهٔ PHP ZipArchive باید روی هاست فعال باشد. خروجی JSON همچنان در دسترس است.');
+        redirect(SITE_URL . '/admin/backup.php');
+    }
     try {
         $uploadArchive = backupCollectUploadFiles();
     } catch (Throwable $uploadError) {
@@ -287,6 +296,7 @@ if (($_GET['action'] ?? '') === 'export') {
         'version' => MIRRORHUB_BACKUP_VERSION,
         'exported_at' => date('c'),
         'site' => SITE_NAME,
+        'file_storage' => $exportFormat,
         'tables' => [],
         'files' => $uploadArchive,
     ];
@@ -309,6 +319,49 @@ if (($_GET['action'] ?? '') === 'export') {
     } catch (Throwable $exportError) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $exportError;
+    }
+
+    if ($exportFormat === 'zip') {
+        $temporaryZip = tempnam(sys_get_temp_dir(), 'mh-backup-');
+        if ($temporaryZip === false) throw new RuntimeException('ساخت فایل موقت ZIP ناموفق بود.');
+        try {
+            $zip = new ZipArchive();
+            $openResult = $zip->open($temporaryZip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            if ($openResult !== true) throw new RuntimeException('ساخت آرشیو ZIP ناموفق بود.');
+            $zipOpen = true;
+            try {
+                $zipPayload = $payload;
+                $zipPayload['files'] = [];
+                foreach ($uploadArchive as $fileEntry) {
+                    $zipPayload['files'][] = [
+                        'path' => $fileEntry['path'],
+                        'size' => $fileEntry['size'],
+                        'sha256' => $fileEntry['sha256'],
+                    ];
+                }
+                $zipJson = json_encode($zipPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                if (!$zip->addFromString('backup.json', $zipJson)) throw new RuntimeException('افزودن manifest به ZIP ناموفق بود.');
+                foreach ($uploadArchive as $fileEntry) {
+                    $content = base64_decode((string)$fileEntry['content_base64'], true);
+                    if ($content === false || !$zip->addFromString('uploads/' . $fileEntry['path'], $content)) {
+                        throw new RuntimeException('افزودن یکی از فایل‌های آپلودی به ZIP ناموفق بود.');
+                    }
+                }
+                if (!$zip->close()) throw new RuntimeException('نهایی‌سازی آرشیو ZIP ناموفق بود.');
+                $zipOpen = false;
+            } finally {
+                if ($zipOpen) $zip->close();
+            }
+            $filename = 'mirrorhub-backup-' . date('Ymd-His') . '.zip';
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($temporaryZip));
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            readfile($temporaryZip);
+        } finally {
+            if (is_file($temporaryZip)) @unlink($temporaryZip);
+        }
+        exit;
     }
 
     $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
