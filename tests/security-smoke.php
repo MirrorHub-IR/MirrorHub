@@ -102,6 +102,8 @@ $assert(str_contains($categoryPublic, "\$category['base_url']"), 'Public categor
 $assert(str_contains($categoryPublic, 'providerUrlMatchesBaseUrl') && str_contains($categoryPublic, "['type'] ?? '') === 'provider'"), 'Provider-only category pages must filter HTTP(S) mirror URLs by provider Base URL.');
 $assert(str_contains($statusPage, '$providerOptions') && str_contains($statusPage, "type = 'provider'") && str_contains($statusPage, 'providerUrlMatchesBaseUrl'), 'Public status page must filter by provider category and its HTTP(S) Base URL.');
 $assert(str_contains($statusPage, 'name="provider_id"') && str_contains($statusPage, 'status-provider-filter'), 'Public status page must expose the provider filter control.');
+$assert(str_contains($statusPage, "\$summary['mirrors'] = count(\$rows)") && str_contains($statusPage, 'DATE_SUB(NOW(), INTERVAL 30 DAY)'), 'Public status summary metrics must match the selected provider Base URL.');
+$assert(str_contains($monitorAdmin, 'name="provider_id"') && str_contains($monitorAdmin, 'monitor-provider-filter') && str_contains($monitorAdmin, 'providerUrlMatchesBaseUrl'), 'Admin monitoring page must expose the same provider Base URL filter.');
 $assert(str_contains($cmsAdmin, "type IN ('software','provider')"), 'Guides must be attachable to both software and provider categories.');
 $assert(str_contains($categoryPage, "WHERE category_id = ? AND status = 'published'"), 'Every category page must show its published guides.');
 $assert(str_contains($categoryFunctions, "'code-2' =>"), 'Development SVG icon must exist in the icon registry.');
