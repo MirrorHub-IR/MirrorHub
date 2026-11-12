@@ -18,9 +18,12 @@ try {
 } catch (Throwable $e) {
     $providerOptions = [];
 }
-$selectedProviderId = filter_var($_GET['provider_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+$providerInput = $_GET['provider_id'] ?? '';
+$selectedProviderId = is_scalar($providerInput) && ctype_digit((string)$providerInput)
+    ? (int)$providerInput
+    : 0;
 $selectedProvider = null;
-if ($selectedProviderId !== false && $selectedProviderId !== null) {
+if ($selectedProviderId > 0) {
     foreach ($providerOptions as $providerOption) {
         if ((int)$providerOption['id'] === (int)$selectedProviderId) {
             $selectedProvider = $providerOption;
@@ -80,12 +83,18 @@ if ($selectedProvider) {
 }
 $providerFilteredTotal = count($rows);
 if ($selectedProvider) {
-    $scopeIdMap = array_fill_keys(array_map('intval', array_column($rows, 'id')), true);
-    $incidents = array_values(array_filter(
-        monitorRecentIncidents($pdo, 100),
-        static fn($incident) => isset($scopeIdMap[(int)($incident['mirror_id'] ?? 0)])
-    ));
-    $incidents = array_slice($incidents, 0, 10);
+    $incidentIds = array_values(array_unique(array_filter(array_map('intval', array_column($rows, 'id')), static fn($id) => $id > 0)));
+    if ($incidentIds) {
+        $incidentIdSql = implode(',', $incidentIds);
+        $incidentQuery = $pdo->query("SELECT i.*, m.name_fa, m.name_en, m.url
+            FROM mirror_incidents i
+            INNER JOIN mirrors m ON m.id = i.mirror_id
+            WHERE i.mirror_id IN ($incidentIdSql)
+            ORDER BY i.started_at DESC LIMIT 10");
+        $incidents = $incidentQuery->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $incidents = [];
+    }
 } else {
     $incidents = monitorRecentIncidents($pdo, 10);
 }
