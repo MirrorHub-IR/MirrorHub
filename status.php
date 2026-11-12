@@ -10,10 +10,10 @@ ensureCategoryBaseUrlSchema($pdo);
 $providerOptions = [];
 try {
     $providerOptions = $pdo->query("SELECT id, name, base_url FROM categories
-        WHERE type = 'provider' AND base_url IS NOT NULL AND base_url <> ''
+        WHERE type = 'provider' AND base_url IS NOT NULL AND TRIM(base_url) <> ''
         ORDER BY sort_order ASC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
     $providerOptions = array_values(array_filter($providerOptions, static function ($provider): bool {
-        return categoryBaseUrlIsValid((string)($provider['base_url'] ?? ''));
+        return trim((string)($provider['base_url'] ?? '')) !== '' && categoryBaseUrlIsValid((string)$provider['base_url']);
     }));
 } catch (Throwable $e) {
     $providerOptions = [];
