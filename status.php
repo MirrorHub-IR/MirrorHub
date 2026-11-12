@@ -43,9 +43,52 @@ if ($selectedProvider) {
         return isset($providerMirrorIds[(int)$row['id']])
             && providerUrlMatchesBaseUrl((string)$row['url'], (string)$selectedProvider['base_url']);
     }));
+
+    // When a provider is selected, make the summary cards match the same
+    // Base URL-scoped mirror set instead of showing the whole system totals.
+    $summary['mirrors'] = count($rows);
+    $summary['up'] = 0;
+    $summary['slow'] = 0;
+    $summary['down'] = 0;
+    $summary['unknown'] = 0;
+    foreach ($rows as $scopedRow) {
+        $state = in_array($scopedRow['status'] ?? '', ['up', 'slow', 'down'], true)
+            ? (string)$scopedRow['status']
+            : 'unknown';
+        $summary[$state]++;
+    }
+    $scopeIds = array_values(array_unique(array_filter(array_map('intval', array_column($rows, 'id')), static fn($id) => $id > 0)));
+    $summary['avg_response_ms'] = null;
+    $summary['uptime_percent'] = null;
+    $summary['total_checks'] = 0;
+    if ($scopeIds) {
+        $scopeIdSql = implode(',', $scopeIds);
+        $scopeAggregate = $pdo->query("SELECT COUNT(*) AS total,
+                SUM(status IN ('up','slow')) AS ok,
+                AVG(CASE WHEN status IN ('up','slow') AND response_ms IS NOT NULL THEN response_ms END) AS avg_ms
+            FROM mirror_checks
+            WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+              AND mirror_id IN ($scopeIdSql)")->fetch(PDO::FETCH_ASSOC);
+        if ($scopeAggregate && (int)$scopeAggregate['total'] > 0) {
+            $summary['uptime_percent'] = round((int)$scopeAggregate['ok'] * 100 / (int)$scopeAggregate['total'], 2);
+            $summary['avg_response_ms'] = $scopeAggregate['avg_ms'] !== null
+                ? (int)round((float)$scopeAggregate['avg_ms'])
+                : null;
+            $summary['total_checks'] = (int)$scopeAggregate['total'];
+        }
+    }
 }
 $providerFilteredTotal = count($rows);
-$incidents = monitorRecentIncidents($pdo, 10);
+if ($selectedProvider) {
+    $scopeIdMap = array_fill_keys(array_map('intval', array_column($rows, 'id')), true);
+    $incidents = array_values(array_filter(
+        monitorRecentIncidents($pdo, 100),
+        static fn($incident) => isset($scopeIdMap[(int)($incident['mirror_id'] ?? 0)])
+    ));
+    $incidents = array_slice($incidents, 0, 10);
+} else {
+    $incidents = monitorRecentIncidents($pdo, 10);
+}
 $mirrorLimit = 40;
 $rows = array_slice($rows, 0, $mirrorLimit);
 $monitoredIds = array_column($rows, 'id');
@@ -75,7 +118,7 @@ renderHeader('وضعیت سرورها');
     <div class="section-header">
         <h1 class="section-title">وضعیت لحظه‌ای سرورها</h1>
         <span class="badge badge-primary" id="mon-last-update" title="آخرین به‌روزرسانی خودکار صفحه">
-            <?= icon('activity', 13) ?> به‌روزرسانی خودکار هر <?= monitorFa(60) ?> ثانیه
+            <?= icon('activity', 13) ?> <?= $selectedProvider ? 'نمایش آمار ارائه‌دهندهٔ انتخابی' : 'به‌روزرسانی خودکار هر ' . monitorFa(60) . ' ثانیه' ?>
         </span>
     </div>
 
@@ -88,7 +131,7 @@ renderHeader('وضعیت سرورها');
                 آخرین چرخهٔ پایش:
                 <strong id="mon-last-run"><?= monitorTimeAgoFa($summary['last_run_at']) ?></strong>
                 <?php if ($summary['last_run_checked'] > 0): ?>
-                    — <?= monitorFa($summary['last_run_checked']) ?> میرور بررسی شد
+                    — <?php if ($selectedProvider): ?>در اجرای کلی سامانه <?= monitorFa($summary['last_run_checked']) ?> میرور بررسی شد<?php else: ?><?= monitorFa($summary['last_run_checked']) ?> میرور بررسی شد<?php endif; ?>
                 <?php endif; ?>
                 <?php if ($summary['enabled']): ?>
                     — بازهٔ پایش خودکار: <strong><?= htmlspecialchars(monitorIntervalLabel(monitorConfiguredIntervalHours($summary))) ?></strong>
@@ -122,7 +165,7 @@ renderHeader('وضعیت سرورها');
         <div class="stat-card info">
             <span class="stat-icon"><?= icon('server', 20) ?></span>
             <h3 id="mon-count-total"><?= monitorFa($summary['mirrors']) ?></h3>
-            <p>میرور تحت پایش</p>
+            <p><?= $selectedProvider ? 'میرور منطبق با ارائه‌دهنده' : 'میرور تحت پایش' ?></p>
         </div>
         <div class="stat-card">
             <span class="stat-icon"><?= icon('activity', 20) ?></span>
@@ -290,6 +333,6 @@ renderHeader('وضعیت سرورها');
     </div>
 </section>
 
-<script>window.MH_MONITOR_REFRESH = 60;</script>
+<script>window.MH_MONITOR_REFRESH = <?= $selectedProvider ? 0 : 60 ?>;</script>
 <script src="<?= asset('js/monitor.js') ?>" defer></script>
 <?php renderFooter(); ?>
