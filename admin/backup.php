@@ -708,30 +708,30 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
         <div>
             <span class="eyebrow">MirrorHub • Data Safety</span>
             <h1 class="section-title">پشتیبان‌گیری و بازیابی</h1>
-            <p class="section-desc">از تمام داده‌های MirrorHub یک فایل JSON نسخه‌دار بسازید یا همان ساختار را دوباره وارد کنید.</p>
+            <p class="section-desc">از پایگاه داده و فایل‌های آپلودی خروجی JSON یا ZIP تهیه کنید و همان پشتیبان را با اعتبارسنجی مسیر و هش بازیابی کنید.</p>
         </div>
     </div>
 
     <div class="alert alert-warning" role="note">
-        فایل پشتیبان شامل همهٔ جدول‌های پایگاه داده و فایل‌های موجود در پوشهٔ uploads (از جمله آیکون دسته‌بندی‌ها) است. سقف هر فایل ۱۰ و مجموع فایل‌ها ۶۴ مگابایت است. فایل پشتیبان ممکن است حاوی توکن‌ها و تنظیمات خصوصی باشد؛ آن را محرمانه نگه دارید و پیش از بازیابی نسخهٔ جداگانه تهیه کنید.
+        فایل پشتیبان شامل همهٔ جدول‌های دیتابیس و فایل‌های مجاز پوشهٔ uploads است؛ سقف هر فایل ۱۰ مگابایت، مجموع فایل‌ها ۶۴ مگابایت و حداکثر تعداد ۱۰۰۰ فایل است. خروجی JSON محتوای فایل‌ها را Base64 می‌کند؛ ZIP فایل‌ها را به‌صورت مستقل نگه می‌دارد. برای ZIP افزونهٔ PHP ZipArchive لازم است. این پشتیبان ممکن است حاوی توکن‌ها و تنظیمات خصوصی باشد؛ آن را محرمانه نگه دارید و پیش از بازیابی نسخهٔ جداگانه تهیه کنید.
     </div>
 
     <div class="backup-actions-grid">
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('database', 21) ?></span>
-                <div><h2>خروجی داده‌ها</h2><p>جدول‌های پایگاه داده و فایل‌های آپلودشدهٔ پوشهٔ uploads داخل یک JSON نسخه‌دار ذخیره می‌شوند.</p></div>
+                <div><h2>خروجی داده‌ها</h2><p>خروجی JSON قابل‌حمل یا ZIP با فایل‌های باینری مستقل؛ هر دو شامل جدول‌های پایگاه داده و فایل‌های مجاز پوشهٔ uploads هستند.</p></div>
             </div>
-            <a href="<?= SITE_URL ?>/admin/backup.php?action=export" class="btn btn-primary backup-download">دانلود فایل پشتیبان</a>
+            <div class="backup-download-actions"><a href="<?= SITE_URL ?>/admin/backup.php?action=export&amp;format=json" class="btn btn-primary">دانلود JSON</a><?php if (class_exists('ZipArchive')): ?><a href="<?= SITE_URL ?>/admin/backup.php?action=export&amp;format=zip" class="btn btn-outline">دانلود ZIP</a><?php else: ?><small class="form-hint">برای فعال‌شدن خروجی ZIP، افزونهٔ PHP ZipArchive را روی هاست فعال کنید.</small><?php endif; ?></div>
             <div class="backup-meta">
-                <span class="badge badge-default">JSON</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">شامل روابط، پروتکل‌ها و آپلودها</span>
+                <span class="badge badge-default">JSON + ZIP</span><span class="badge badge-default">نسخه <?= MIRRORHUB_BACKUP_VERSION ?></span><span class="badge badge-default">داده‌ها + فایل‌ها + SHA-256</span>
             </div>
         </div>
 
         <div class="backup-card">
             <div class="backup-card-head">
                 <span class="backup-icon"><?= icon('inbox', 21) ?></span>
-                <div><h2>ورودی داده‌ها</h2><p>فایل JSON را انتخاب کنید، بکشید و رها کنید یا پس از تمرکز روی ناحیه با Ctrl+V بچسبانید.</p></div>
+                <div><h2>ورودی داده‌ها</h2><p>فایل JSON یا ZIP را انتخاب کنید، بکشید و رها کنید؛ در صورت پشتیبانی مرورگر، فایل یا تصویر کپی‌شده را پس از تمرکز روی ناحیه با Ctrl+V وارد کنید.</p></div>
             </div>
 
             <form action="<?= SITE_URL ?>/admin/backup.php" method="POST" enctype="multipart/form-data" id="backup-import-form">
@@ -739,17 +739,17 @@ renderHeader('پشتیبان‌گیری و بازیابی', true);
                 <input type="hidden" name="backup_action" value="import">
 
                 <label class="import-zone" id="backup-dropzone" data-upload-zone for="backup-file">
-                    <input type="file" id="backup-file" name="backup_file" accept=".json,application/json" required>
+                    <input type="file" id="backup-file" name="backup_file" accept=".json,.zip,application/json,application/zip" required>
                     <div>
                         <div class="import-zone-icon"><?= icon('inbox', 25) ?></div>
-                        <strong>فایل JSON را اینجا رها کنید</strong>
-                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت</span>
+                        <strong>فایل JSON یا ZIP را اینجا رها کنید</strong>
+                        <span>یا برای انتخاب فایل کلیک کنید • حداکثر ۱۰۰ مگابایت، تابع محدودیت‌های هاست</span>
                     </div>
                 </label>
 
                 <div class="file-pill" id="backup-file-pill">
                     <div class="file-pill-main"><span><?= icon('check', 15) ?></span><strong id="backup-file-name">فایل انتخاب شد</strong><span id="backup-file-size"></span></div>
-                    <span class="badge badge-success">JSON</span>
+                    <span class="badge badge-success">JSON / ZIP</span>
                 </div>
 
                 <div class="import-options">
