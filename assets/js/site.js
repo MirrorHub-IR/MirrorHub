@@ -130,9 +130,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const clipboardFiles = clipboardData => {
+        if (!clipboardData) return [];
+        let files = Array.from(clipboardData.files || []);
+        if (!files.length && clipboardData.items) {
+            files = Array.from(clipboardData.items)
+                .filter(item => item.kind === 'file')
+                .map(item => {
+                    try { return item.getAsFile(); } catch (_) { return null; }
+                })
+                .filter(Boolean);
+        }
+        return files.map((file, index) => {
+            if (file.name) return file;
+            const mime = (file.type || 'image/png').toLowerCase();
+            const extension = mime === 'image/jpeg' ? 'jpg' : (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/g, '') || 'png';
+            try { return new File([file], 'clipboard-image-' + (index + 1) + '.' + extension, { type: mime }); }
+            catch (_) { return file; }
+        });
+    };
+
     document.addEventListener('paste', event => {
-        const files = event.clipboardData && event.clipboardData.files;
-        if (!activeUploadInput || !files || !files.length) return;
+        if (!activeUploadInput) return;
+        const files = clipboardFiles(event.clipboardData);
+        if (!files.length) return;
         if (assignUploadFiles(activeUploadInput, files)) event.preventDefault();
     });
 
