@@ -40,6 +40,22 @@ $GLOBALS['pageSeo'] = [
 ];
 $subCategories = getCategories($pdo, $category['id']);
 $mirrors = getMirrorsByCategory($pdo, $category['id']);
+$providerBaseUrl = '';
+if (($category['type'] ?? '') === 'provider') {
+    $configuredBaseUrl = trim((string)($category['base_url'] ?? ''));
+    if ($configuredBaseUrl !== '' && categoryBaseUrlIsValid($configuredBaseUrl)) {
+        $providerBaseUrl = $configuredBaseUrl;
+    }
+    // Provider pages only list HTTP(S) mirrors. When a valid Base URL is set,
+    // the mirror must share its scheme, host, port and path boundary.
+    $mirrors = array_values(array_filter($mirrors, static function ($mirror) use ($providerBaseUrl): bool {
+        $url = trim((string)($mirror['url'] ?? ''));
+        $parts = parse_url($url);
+        $scheme = strtolower((string)($parts['scheme'] ?? ''));
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !in_array($scheme, ['http', 'https'], true)) return false;
+        return $providerBaseUrl === '' || providerUrlMatchesBaseUrl($url, $providerBaseUrl);
+    }));
+}
 $mirrorIds = array_column($mirrors, 'id');
 $mirrorCategoryMap = getMirrorCategoryTagsMap($pdo, $mirrorIds);
 $mirrorProtocolMap = getMirrorProtocolsMap($pdo, $mirrorIds);
@@ -53,15 +69,12 @@ unset($mirror);
 // وضعیت لحظه‌ای پایش سرورها برای نشان دادن روی کارت‌ها
 $monitorStatuses = monitorStatusMap($pdo, $mirrorIds);
 
-// راهنماهای منتشرشده‌ای که مستقیماً به همین دستهٔ نرم‌افزاری وصل شده‌اند.
-$relatedGuides = [];
-if (($category['type'] ?? '') === 'software') {
-    $guideQuery = $pdo->prepare("SELECT title, slug, excerpt, published_at FROM cms_articles
-        WHERE category_id = ? AND status = 'published'
-        ORDER BY COALESCE(published_at, created_at) DESC, id DESC");
-    $guideQuery->execute([(int)$category['id']]);
-    $relatedGuides = $guideQuery->fetchAll();
-}
+// راهنماهای منتشرشده‌ای که مستقیماً به همین دستهٔ نرم‌افزاری یا ارائه‌دهنده وصل شده‌اند.
+$guideQuery = $pdo->prepare("SELECT title, slug, excerpt, published_at FROM cms_articles
+    WHERE category_id = ? AND status = 'published'
+    ORDER BY COALESCE(published_at, created_at) DESC, id DESC");
+$guideQuery->execute([(int)$category['id']]);
+$relatedGuides = $guideQuery->fetchAll();
 if (!empty($relatedGuides)) {
     $GLOBALS['pageSeo']['styles'] = ['css/cms.css'];
 }
@@ -89,8 +102,11 @@ renderHeader($category['name']);
     <?php if ($category['description']): ?>
         <p class="category-desc"><?= htmlspecialchars($category['description'], ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
-    <?php if (!empty($category['base_url'])): ?>
+    <?php if (!empty($category['base_url']) && categoryBaseUrlIsValid((string)$category['base_url'])): ?>
         <p class="category-base-url"><strong>نشانی پایهٔ این دسته:</strong> <a href="<?= htmlspecialchars($category['base_url'], ENT_QUOTES, 'UTF-8') ?>" class="ltr-text" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($category['base_url'], ENT_QUOTES, 'UTF-8') ?></a></p>
+    <?php endif; ?>
+    <?php if (($category['type'] ?? '') === 'provider'): ?>
+        <p class="category-provider-filter-note">در فهرست این ارائه‌دهنده فقط نشانی‌های HTTP و HTTPS نمایش داده می‌شوند<?php if ($providerBaseUrl !== ''): ?> که با دامنه و مسیر Base URL بالا مطابقت دارند<?php else: ?>؛ برای محدودسازی دقیق‌تر، Base URL معتبر را در پنل مدیریت تنظیم کنید<?php endif; ?>.</p>
     <?php endif; ?>
 </section>
 
