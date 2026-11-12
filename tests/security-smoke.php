@@ -11,6 +11,7 @@ $config = file_get_contents($root . '/config.php') ?: '';
 $setup = file_get_contents($root . '/setup.php') ?: '';
 $backup = file_get_contents($root . '/admin/backup.php') ?: '';
 $mirrorDetail = file_get_contents($root . '/mirror.php') ?: '';
+$statusPage = file_get_contents($root . '/status.php') ?: '';
 $searchPage = file_get_contents($root . '/search.php') ?: '';
 $homePage = file_get_contents($root . '/index.php') ?: '';
 $categoryPage = file_get_contents($root . '/category.php') ?: '';
@@ -41,6 +42,7 @@ $siteJs = file_get_contents($root . '/assets/js/site.js') ?: '';
 $monitorAdmin = file_get_contents($root . '/admin/monitor.php') ?: '';
 $backupAdmin = file_get_contents($root . '/admin/backup.php') ?: '';
 $adminStyles = file_get_contents($root . '/assets/css/admin.css') ?: '';
+$adminMirrorForm = file_get_contents($root . '/admin/mirrors.php') ?: '';
 $adminHelp = file_get_contents($root . '/admin/help.php') ?: '';
 $adminGuide = file_get_contents($root . '/docs/admin-guide.md') ?: '';
 $appJs = file_get_contents($root . '/assets/js/app.js') ?: '';
@@ -98,6 +100,10 @@ $assert(str_contains($categoryAdmin, 'delete-category-icon-form'), 'Category ico
 $assert(!str_contains($categoryAdmin, '<form action="<?= SITE_URL ?>/admin/categories.php?id=<?= $id ?>" method="POST" style="display: inline-block;'), 'Category editor must not contain nested forms.');
 $assert(str_contains($categoryPublic, "\$category['base_url']"), 'Public category page must display the configured base URL.');
 $assert(str_contains($categoryPublic, 'providerUrlMatchesBaseUrl') && str_contains($categoryPublic, "['type'] ?? '') === 'provider'"), 'Provider-only category pages must filter HTTP(S) mirror URLs by provider Base URL.');
+$assert(str_contains($statusPage, '$providerOptions') && str_contains($statusPage, "type = 'provider'") && str_contains($statusPage, 'providerUrlMatchesBaseUrl'), 'Public status page must filter by provider category and its HTTP(S) Base URL.');
+$assert(str_contains($statusPage, 'name="provider_id"') && str_contains($statusPage, 'status-provider-filter'), 'Public status page must expose the provider filter control.');
+$assert(str_contains($statusPage, "\$summary['mirrors'] = count(\$rows)") && str_contains($statusPage, 'DATE_SUB(NOW(), INTERVAL 30 DAY)'), 'Public status summary metrics must match the selected provider Base URL.');
+$assert(str_contains($monitorAdmin, 'name="provider_id"') && str_contains($monitorAdmin, 'monitor-provider-filter') && str_contains($monitorAdmin, 'providerUrlMatchesBaseUrl'), 'Admin monitoring page must expose the same provider Base URL filter.');
 $assert(str_contains($cmsAdmin, "type IN ('software','provider')"), 'Guides must be attachable to both software and provider categories.');
 $assert(str_contains($categoryPage, "WHERE category_id = ? AND status = 'published'"), 'Every category page must show its published guides.');
 $assert(str_contains($categoryFunctions, "'code-2' =>"), 'Development SVG icon must exist in the icon registry.');
@@ -224,7 +230,7 @@ $assert(str_contains($backupAdmin, 'backupValidateUploadFiles') && str_contains(
 $assert(str_contains($backupAdmin, 'ZipArchive') && str_contains($backupAdmin, 'backupValidateZipUploadFiles') && str_contains($backupAdmin, "'file_storage' => " . '$exportFormat'), 'ZIP backup export and secure ZIP restore support are missing.');
 $assert(str_contains($backupAdmin, '100 * 1024 * 1024') && str_contains($backupAdmin, "['json', 'zip']"), 'Backup upload must accept JSON/ZIP up to the documented 100 MB limit.');
 $assert(str_contains($backupAdmin, 'backupNormalizeUploadPath') && str_contains($backupAdmin, 'content_base64') && str_contains($backupAdmin, 'sha256'), 'Uploaded-file archives must validate safe relative paths and integrity hashes.');
-$assert(str_contains($siteJs, "document.addEventListener('paste'") && str_contains($siteJs, 'clipboardData.items') && str_contains($siteJs, 'DataTransfer') && str_contains($siteJs, 'is-dragging'), 'Global upload areas must support clipboard files/items, drag/drop and selected-file updates.');
+$assert(str_contains($siteJs, "document.addEventListener('paste'") && str_contains($siteJs, 'clipboardData.items') && str_contains($siteJs, 'clipboardData.files') && str_contains($siteJs, "addEventListener('pointerdown'") && str_contains($siteJs, 'DataTransfer') && str_contains($siteJs, 'is-dragging'), 'Global upload areas must support focused clipboard files/items, pointer activation, drag/drop and selected-file updates.');
 $assert(str_contains($appJs, "['json', 'zip']") && str_contains($appJs, '100 * 1024 * 1024'), 'Backup import UI must accept ZIP and JSON up to 100 MB.');
 $assert(str_contains($monitorAdmin, 'name="scheme"') && str_contains($monitorAdmin, 'mon-card-grid') && str_contains($monitorAdmin, 'monitorUrlScheme'), 'Admin monitor page must provide URL-scheme filtering and responsive cards.');
 $assert(str_contains($monitoring, "LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%'") && str_contains($monitoring, 'function monitorUrlScheme'), 'Monitoring cycle and summaries must only include HTTP/HTTPS URLs.');
@@ -232,6 +238,8 @@ $assert(str_contains($adminStyles, '.admin-sidebar { overflow-x: hidden; }') && 
 $assert(str_contains($adminHelp, 'Base URL') && str_contains($adminHelp, 'Ctrl+V') && str_contains($adminHelp, 'SVG'), 'In-panel admin guide must explain category base URLs, SVG and file paste.');
 $assert(str_contains($adminGuide, 'Base URL') && str_contains($adminGuide, 'uploads/') && str_contains($adminGuide, 'HTTPS') && str_contains($adminGuide, 'ZIP') && str_contains($adminGuide, 'پینگ'), 'Persian admin guide must document provider filtering, ping and JSON/ZIP backups.');
 $assert(str_contains($adminStyles, 'MirrorHub admin responsive hardening') && str_contains($adminStyles, '@media (max-width: 620px)'), 'Admin screens must include global responsive hardening.');
+$assert(str_contains($adminStyles, 'MirrorHub category picker layout hardening') && str_contains($adminStyles, 'overflow-x: hidden') && str_contains($adminStyles, 'auto-fit'), 'Mirror editor category picker must wrap cards without horizontal overflow.');
+$assert(str_contains($adminMirrorForm, 'mirror-category-heading') && str_contains($adminMirrorForm, 'mirror-category-icon'), 'Mirror category cards must align icons and labels in a dedicated heading row.');
 $assert(str_contains($functions, 'providerUrlMatchesBaseUrl') && str_contains($layout, "'mirror.php', 'mirrors.php'"), 'Ping and provider URL matching must be wired into public routes.');
 
 if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {

@@ -378,11 +378,13 @@ $selectedProtocolValues = array_map(fn($p) => $p['protocol'], $selectedProtocols
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                                 <span class="mirror-category-copy">
-                                                    <?php if (!empty($cat['icon'])): ?>
-                                                        <img src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon']) ?>" alt="" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-left:4px;">
-                                                    <?php endif; ?>
-                                                    <strong><?= htmlspecialchars($cat['name']) ?></strong>
-                                                    <?php if ($parentLabel): ?><small><?= htmlspecialchars($parentLabel) ?></small><?php else: ?><small>دسته‌بندی اصلی</small><?php endif; ?>
+                                                    <span class="mirror-category-heading">
+                                                        <?php if (!empty($cat['icon'])): ?>
+                                                            <img class="mirror-category-icon" src="<?= SITE_URL ?>/uploads/category-icons/<?= htmlspecialchars($cat['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" width="20" height="20" loading="lazy" decoding="async">
+                                                        <?php endif; ?>
+                                                        <strong><?= htmlspecialchars($cat['name'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    </span>
+                                                    <?php if ($parentLabel): ?><small><?= htmlspecialchars($parentLabel, ENT_QUOTES, 'UTF-8') ?></small><?php else: ?><small>دسته‌بندی اصلی</small><?php endif; ?>
                                                 </span>
                                             </label>
                                         <?php endforeach; ?>

@@ -114,9 +114,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
    داده‌ها برای نمایش
    ============================================================ */
 ensureMonitorSchema($pdo);
+ensureCategoryBaseUrlSchema($pdo);
 $settings = monitorSettings($pdo);
 $summary = monitorStatusSummary($pdo);
+
+$providerOptions = [];
+try {
+    $providerOptions = $pdo->query("SELECT id, name, base_url FROM categories
+        WHERE type = 'provider' AND base_url IS NOT NULL AND TRIM(base_url) <> ''
+        ORDER BY sort_order ASC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $providerOptions = array_values(array_filter($providerOptions, static function ($provider): bool {
+        return trim((string)($provider['base_url'] ?? '')) !== ''
+            && categoryBaseUrlIsValid((string)$provider['base_url']);
+    }));
+} catch (Throwable $e) {
+    $providerOptions = [];
+}
+$providerInput = $_GET['provider_id'] ?? '';
+$providerFilterId = is_scalar($providerInput) && ctype_digit((string)$providerInput)
+    ? (int)$providerInput
+    : 0;
+$selectedProvider = null;
+if ($providerFilterId > 0) {
+    foreach ($providerOptions as $providerOption) {
+        if ((int)$providerOption['id'] === $providerFilterId) {
+            $selectedProvider = $providerOption;
+            break;
+        }
+    }
+}
+if (!$selectedProvider) $providerFilterId = 0;
+
 $rows = monitorMirrorRows($pdo);
+$incidents = [];
+if ($selectedProvider) {
+    $providerMirrorIds = [];
+    $providerMirrorQuery = $pdo->prepare("SELECT mirror_id FROM mirror_categories WHERE category_id = ?");
+    $providerMirrorQuery->execute([(int)$selectedProvider['id']]);
+    foreach ($providerMirrorQuery->fetchAll(PDO::FETCH_COLUMN) as $providerMirrorId) {
+        $providerMirrorIds[(int)$providerMirrorId] = true;
+    }
+    $rows = array_values(array_filter($rows, static function ($row) use ($providerMirrorIds, $selectedProvider): bool {
+        return isset($providerMirrorIds[(int)$row['id']])
+            && providerUrlMatchesBaseUrl((string)$row['url'], (string)$selectedProvider['base_url']);
+    }));
+
+    $summary['mirrors'] = count($rows);
+    $summary['up'] = 0;
+    $summary['slow'] = 0;
+    $summary['down'] = 0;
+    $summary['unknown'] = 0;
+    foreach ($rows as $scopedRow) {
+        $state = in_array($scopedRow['status'] ?? '', ['up', 'slow', 'down'], true)
+            ? (string)$scopedRow['status']
+            : 'unknown';
+        $summary[$state]++;
+    }
+    $scopeIds = array_values(array_unique(array_filter(array_map('intval', array_column($rows, 'id')), static fn($id) => $id > 0)));
+    $summary['avg_response_ms'] = null;
+    $summary['uptime_percent'] = null;
+    $summary['total_checks'] = 0;
+    if ($scopeIds) {
+        $scopeIdSql = implode(',', $scopeIds);
+        $scopeAggregate = $pdo->query("SELECT COUNT(*) AS total,
+                SUM(status IN ('up','slow')) AS ok,
+                AVG(CASE WHEN status IN ('up','slow') AND response_ms IS NOT NULL THEN response_ms END) AS avg_ms
+            FROM mirror_checks
+            WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+              AND mirror_id IN ($scopeIdSql)")->fetch(PDO::FETCH_ASSOC);
+        if ($scopeAggregate && (int)$scopeAggregate['total'] > 0) {
+            $summary['uptime_percent'] = round((int)$scopeAggregate['ok'] * 100 / (int)$scopeAggregate['total'], 2);
+            $summary['avg_response_ms'] = $scopeAggregate['avg_ms'] !== null
+                ? (int)round((float)$scopeAggregate['avg_ms'])
+                : null;
+            $summary['total_checks'] = (int)$scopeAggregate['total'];
+        }
+        $incidentQuery = $pdo->query("SELECT i.*, m.name_fa, m.name_en, m.url
+            FROM mirror_incidents i
+            INNER JOIN mirrors m ON m.id = i.mirror_id
+            WHERE i.mirror_id IN ($scopeIdSql)
+            ORDER BY i.started_at DESC LIMIT 10");
+        $incidents = $incidentQuery->fetchAll(PDO::FETCH_ASSOC);
+    }
+} else {
+    $incidents = monitorRecentIncidents($pdo, 10);
+}
+
 $schemeFilter = strtolower(trim((string)($_GET['scheme'] ?? 'all')));
 if (!in_array($schemeFilter, ['all', 'http', 'https'], true)) $schemeFilter = 'all';
 $schemeCounts = ['http' => 0, 'https' => 0];
@@ -127,7 +210,6 @@ foreach ($rows as $monitorRow) {
 if ($schemeFilter !== 'all') {
     $rows = array_values(array_filter($rows, static fn($row) => monitorUrlScheme((string)($row['url'] ?? '')) === $schemeFilter));
 }
-$incidents = monitorRecentIncidents($pdo, 10);
 $cronKey = monitorCronKey($pdo);
 $intervalHours = monitorConfiguredIntervalHours($settings);
 $cronExpression = monitorCronExpression($intervalHours);
@@ -210,21 +292,32 @@ renderHeader('پایش سرورها', true);
 
     <form method="get" action="<?= SITE_URL ?>/admin/monitor.php" class="mon-filter-bar">
         <div>
-            <strong>پالایش بر اساس پروتکل URL</strong>
-            <small>فقط HTTP و HTTPS پایش می‌شوند؛ مقدار پروتکل ثبت‌شده در میرور صرفاً متادیتاست.</small>
+            <strong>پالایش ارائه‌دهنده و پروتکل URL</strong>
+            <small>فقط دسته‌های ارائه‌دهنده با Base URL معتبر HTTP/HTTPS قابل انتخاب‌اند؛ تطبیق مسیر پایه نیز بررسی می‌شود.</small>
         </div>
-        <label for="monitor-scheme-filter">پروتکل نشانی</label>
-        <select id="monitor-scheme-filter" name="scheme">
-            <option value="all" <?= $schemeFilter === 'all' ? 'selected' : '' ?>>همهٔ HTTP/HTTPS (<?= monitorFa($schemeCounts['http'] + $schemeCounts['https']) ?>)</option>
-            <option value="https" <?= $schemeFilter === 'https' ? 'selected' : '' ?>>HTTPS (<?= monitorFa($schemeCounts['https']) ?>)</option>
-            <option value="http" <?= $schemeFilter === 'http' ? 'selected' : '' ?>>HTTP (<?= monitorFa($schemeCounts['http']) ?>)</option>
-        </select>
+        <div class="mon-filter-field">
+            <label for="monitor-provider-filter">ارائه‌دهنده</label>
+            <select id="monitor-provider-filter" name="provider_id">
+                <option value="0">همهٔ ارائه‌دهندگان</option>
+                <?php foreach ($providerOptions as $providerOption): ?>
+                    <option value="<?= (int)$providerOption['id'] ?>" <?= $providerFilterId === (int)$providerOption['id'] ? 'selected' : '' ?>><?= htmlspecialchars($providerOption['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="mon-filter-field">
+            <label for="monitor-scheme-filter">پروتکل نشانی</label>
+            <select id="monitor-scheme-filter" name="scheme">
+                <option value="all" <?= $schemeFilter === 'all' ? 'selected' : '' ?>>همهٔ HTTP/HTTPS (<?= monitorFa($schemeCounts['http'] + $schemeCounts['https']) ?>)</option>
+                <option value="https" <?= $schemeFilter === 'https' ? 'selected' : '' ?>>HTTPS (<?= monitorFa($schemeCounts['https']) ?>)</option>
+                <option value="http" <?= $schemeFilter === 'http' ? 'selected' : '' ?>>HTTP (<?= monitorFa($schemeCounts['http']) ?>)</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary"><?= icon('filter', 15) ?> اعمال فیلتر</button>
-        <?php if ($schemeFilter !== 'all'): ?><a href="<?= SITE_URL ?>/admin/monitor.php" class="btn btn-outline">پاک‌کردن فیلتر</a><?php endif; ?>
+        <?php if ($schemeFilter !== 'all' || $selectedProvider): ?><a href="<?= SITE_URL ?>/admin/monitor.php" class="btn btn-outline">پاک‌کردن فیلتر</a><?php endif; ?>
     </form>
 
     <?php if (empty($rows)): ?>
-        <p class="empty-state"><?= $schemeFilter === 'all' ? 'میرور HTTP یا HTTPS واجد شرایطی برای پایش وجود ندارد.' : 'میروری با این پروتکل در فهرست پایش پیدا نشد.' ?></p>
+        <p class="empty-state"><?php if ($selectedProvider): ?>برای ارائه‌دهندهٔ انتخاب‌شده، میرور فعال HTTP/HTTPS منطبق با Base URL پیدا نشد.<?php elseif ($schemeFilter !== 'all'): ?>میروری با این پروتکل در فهرست پایش پیدا نشد.<?php else: ?>میرور HTTP یا HTTPS واجد شرایطی برای پایش وجود ندارد.<?php endif; ?></p>
     <?php else: ?>
         <div class="mon-card-grid">
             <?php foreach ($rows as $row): ?>

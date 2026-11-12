@@ -4795,3 +4795,44 @@ select, textarea { min-width: 0; }
 @media (hover: none) and (pointer: coarse) {
     .btn, .main-nav a, .directory-filter select, .directory-filter input { min-height: 44px; }
 }
+
+/* MirrorHub provider status filter */
+.mon-status-filter-panel {
+    margin: 0 0 1rem;
+    padding: clamp(.85rem, 2vw, 1.15rem);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-secondary);
+}
+.mon-status-filter {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: .7rem;
+    min-width: 0;
+}
+.mon-status-filter-copy {
+    display: grid;
+    flex: 1 1 320px;
+    gap: .2rem;
+    min-width: min(100%, 240px);
+}
+.mon-status-filter-copy strong { color: var(--text-primary); font-size: .9rem; }
+.mon-status-filter-copy small,
+.mon-status-filter-help { color: var(--text-muted); font-size: .76rem; line-height: 1.9; }
+.mon-status-filter-field {
+    display: grid;
+    flex: 0 1 230px;
+    gap: .35rem;
+    min-width: min(100%, 180px);
+}
+.mon-status-filter-field label { color: var(--text-secondary); font-size: .76rem; font-weight: 700; }
+.mon-status-filter-field select { width: 100%; min-width: 0; }
+.mon-status-filter > .btn { flex: 0 0 auto; min-height: 44px; }
+.mon-status-filter-help { margin: .55rem 0 0; }
+.mon-status-filter-help strong { color: var(--text-primary); }
+@media (max-width: 680px) {
+    .mon-status-filter { display: grid; grid-template-columns: minmax(0,1fr); align-items: stretch; }
+    .mon-status-filter-copy, .mon-status-filter-field { min-width: 0; width: 100%; }
+    .mon-status-filter > .btn { width: 100%; justify-content: center; }
+}

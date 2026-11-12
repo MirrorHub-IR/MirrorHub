@@ -45,9 +45,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    /* Generic upload UX: keyboard focus, drag/drop and paste from the clipboard. */
+    /* Generic upload UX: keyboard focus, drag/drop and clipboard file/image paste. */
     let activeUploadInput = null;
+    let activeUploadZone = null;
     const uploadInputs = Array.from(document.querySelectorAll('input[type="file"]'));
+    const isUploadInputUsable = input => !!input && input.isConnected && !input.disabled;
+
+    const zoneForInput = input => input ? (input.closest('[data-upload-zone]') || input.parentElement) : null;
+    const inputForTarget = target => {
+        if (!target || target.nodeType !== 1) return null;
+        if (target.matches('input[type="file"]')) return target;
+        const zone = target.closest('[data-upload-zone], .mh-upload-zone');
+        return zone ? zone.querySelector('input[type="file"]') : null;
+    };
+    const activateUpload = input => {
+        if (!isUploadInputUsable(input)) return;
+        activeUploadInput = input;
+        activeUploadZone = zoneForInput(input);
+    };
 
     const matchesFileAccept = (file, input) => {
         const accept = (input.getAttribute('accept') || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
@@ -62,8 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const assignUploadFiles = (input, fileList) => {
-        if (!input || !fileList || !fileList.length) return false;
-        const accepted = Array.from(fileList).filter(file => matchesFileAccept(file, input));
+        if (!isUploadInputUsable(input) || !fileList || !fileList.length) return false;
+        const accepted = Array.from(fileList).filter(file => file && matchesFileAccept(file, input));
         const selected = input.multiple ? accepted : accepted.slice(0, 1);
         if (!selected.length) {
             if (typeof window.showAlert === 'function') {
@@ -72,18 +87,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         try {
+            if (typeof DataTransfer !== 'function') throw new Error('DataTransfer is unavailable');
             const transfer = new DataTransfer();
             selected.forEach(file => transfer.items.add(file));
             input.files = transfer.files;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
+            activateUpload(input);
             return true;
         } catch (_) {
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('مرورگر اجازهٔ اتصال فایل Clipboard به فرم را نداد. از انتخاب فایل یا Drag & Drop استفاده کنید.', 'warning', 'مرورگر پشتیبانی نمی‌کند');
+            }
             return false;
         }
     };
 
     uploadInputs.forEach(input => {
-        const zone = input.closest('[data-upload-zone]') || input.parentElement;
+        const zone = zoneForInput(input);
         if (!zone) return;
         zone.classList.add('mh-upload-zone');
         if (!zone.hasAttribute('tabindex')) zone.setAttribute('tabindex', '0');
@@ -91,25 +112,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (input.disabled) return;
 
         const isBackupDropzone = zone.id === 'backup-dropzone';
+        const activate = () => activateUpload(input);
         if (!zone.querySelector('.mh-upload-instructions') && !zone.querySelector('.mh-file-upload-prompt') && !isBackupDropzone) {
             const hint = document.createElement('small');
             hint.className = 'mh-upload-instructions';
-            hint.textContent = 'برای انتخاب کلیک کنید، فایل را اینجا رها کنید یا پس از تمرکز روی این بخش با Ctrl+V بچسبانید.';
+            hint.textContent = 'برای انتخاب کلیک یا لمس کنید؛ فایل را اینجا رها کنید یا ناحیه را متمرکز کرده و با Ctrl+V بچسبانید.';
             zone.appendChild(hint);
         }
 
-        const activate = () => { activeUploadInput = input; };
+        zone.addEventListener('pointerdown', activate);
         zone.addEventListener('focusin', activate);
-        input.addEventListener('focus', activate);
         zone.addEventListener('click', activate);
+        input.addEventListener('focus', activate);
+        input.addEventListener('change', activate);
         zone.addEventListener('keydown', event => {
             if (event.target !== zone || !['Enter', ' '].includes(event.key)) return;
             event.preventDefault();
-            input.click();
             activate();
+            input.click();
         });
 
-        if (isBackupDropzone) return; // backup-specific handler also updates the selected-file summary.
+        if (isBackupDropzone) return; // Backup has a dedicated drop handler that also updates its file summary.
         ['dragenter', 'dragover'].forEach(type => zone.addEventListener(type, event => {
             event.preventDefault();
             event.stopPropagation();
@@ -124,24 +147,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     });
 
+    // Keep the intended upload target in sync with both pointer and keyboard navigation.
     document.addEventListener('focusin', event => {
-        if (activeUploadInput && !event.target.closest('.mh-upload-zone') && event.target !== activeUploadInput) {
-            activeUploadInput = null;
+        const targetInput = inputForTarget(event.target);
+        if (targetInput) {
+            activateUpload(targetInput);
+            return;
         }
-    });
+        if (event.target.matches && event.target.matches('input, textarea, select, [contenteditable="true"]')) {
+            activeUploadInput = null;
+            activeUploadZone = null;
+        }
+    }, true);
+
+    document.addEventListener('pointerdown', event => {
+        const targetInput = inputForTarget(event.target);
+        if (targetInput) {
+            activateUpload(targetInput);
+            return;
+        }
+        if (event.target.closest && event.target.closest('input:not([type="file"]), textarea, select, [contenteditable="true"]')) {
+            activeUploadInput = null;
+            activeUploadZone = null;
+        }
+    }, true);
 
     const clipboardFiles = clipboardData => {
         if (!clipboardData) return [];
-        let files = Array.from(clipboardData.files || []);
-        if (!files.length && clipboardData.items) {
-            files = Array.from(clipboardData.items)
-                .filter(item => item.kind === 'file')
-                .map(item => {
-                    try { return item.getAsFile(); } catch (_) { return null; }
-                })
-                .filter(Boolean);
-        }
-        return files.map((file, index) => {
+        const found = [];
+        const seen = new Set();
+        const addFile = file => {
+            if (!file) return;
+            const key = [file.name || '', file.size || 0, file.type || ''].join('|');
+            if (seen.has(key)) return;
+            seen.add(key);
+            found.push(file);
+        };
+
+        // Chromium exposes image data through ClipboardItem.getAsFile(); other
+        // browsers may also populate clipboardData.files. Read both interfaces.
+        Array.from(clipboardData.files || []).forEach(addFile);
+        Array.from(clipboardData.items || []).forEach(item => {
+            const type = (item.type || '').toLowerCase();
+            if (item.kind !== 'file' && !type.startsWith('image/')) return;
+            try { addFile(item.getAsFile()); } catch (_) {}
+        });
+
+        return found.map((file, index) => {
             if (file.name) return file;
             const mime = (file.type || 'image/png').toLowerCase();
             const extension = mime === 'image/jpeg' ? 'jpg' : (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/g, '') || 'png';
@@ -151,11 +203,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.addEventListener('paste', event => {
-        if (!activeUploadInput) return;
+        // Prefer the zone containing the paste target, then the last intentionally
+        // focused/clicked upload zone. Do not guess when there are several inputs.
+        const targetInput = inputForTarget(event.target) || inputForTarget(document.activeElement);
+        const input = targetInput || activeUploadInput;
+        if (!isUploadInputUsable(input)) return;
+
         const files = clipboardFiles(event.clipboardData);
         if (!files.length) return;
-        if (assignUploadFiles(activeUploadInput, files)) event.preventDefault();
-    });
+        if (assignUploadFiles(input, files)) event.preventDefault();
+    }, true);
 
     document.addEventListener('keydown', event => {
         if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
