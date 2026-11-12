@@ -386,36 +386,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
         redirect(SITE_URL . '/admin/backup.php');
     }
 
-    if (!isset($_FILES['backup_file']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
-        flash('error', 'فایل JSON معتبر انتخاب کنید.');
+    $file = $_FILES['backup_file'] ?? null;
+    if (!is_array($file) || (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $uploadMessage = $uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE
+            ? 'فایل از محدودیت حجم آپلود PHP بزرگ‌تر است.'
+            : 'فایل JSON یا ZIP معتبر انتخاب کنید.';
+        flash('error', $uploadMessage);
         redirect(SITE_URL . '/admin/backup.php');
     }
-
-    $file = $_FILES['backup_file'];
-    if (($file['size'] ?? 0) > 25 * 1024 * 1024) {
+    if ((int)($file['size'] ?? 0) > 100 * 1024 * 1024) {
         flash('error', 'حجم فایل پشتیبان نباید بیشتر از ۱۰۰ مگابایت باشد.');
         redirect(SITE_URL . '/admin/backup.php');
     }
-    if (strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION)) !== 'json') {
-        flash('error', 'فقط فایل با پسوند JSON پذیرفته می‌شود.');
+    $fileExtension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($fileExtension, ['json', 'zip'], true)) {
+        flash('error', 'فقط فایل پشتیبان با پسوند JSON یا ZIP پذیرفته می‌شود.');
         redirect(SITE_URL . '/admin/backup.php');
     }
 
-    $raw = file_get_contents($file['tmp_name']);
-    if ($raw === false || trim($raw) === '') {
-        flash('error', 'فایل پشتیبان خالی یا غیرقابل خواندن است.');
-        redirect(SITE_URL . '/admin/backup.php');
-    }
-
+    $zipArchive = null;
     try {
+        if ($fileExtension === 'zip') {
+            if (!class_exists('ZipArchive')) throw new RuntimeException('برای بازیابی ZIP، افزونهٔ PHP ZipArchive باید روی هاست فعال باشد.');
+            $zipArchive = new ZipArchive();
+            if ($zipArchive->open((string)$file['tmp_name']) !== true) throw new RuntimeException('فایل ZIP خراب یا غیرقابل خواندن است.');
+            $manifestStat = $zipArchive->statName('backup.json');
+            if (!is_array($manifestStat) || (int)($manifestStat['size'] ?? 0) > 100 * 1024 * 1024) {
+                throw new RuntimeException('فایل backup.json در آرشیو ZIP وجود ندارد یا بیش از حد بزرگ است.');
+            }
+            $raw = $zipArchive->getFromName('backup.json');
+        } else {
+            $raw = file_get_contents((string)$file['tmp_name']);
+        }
+        if ($raw === false || trim($raw) === '') throw new RuntimeException('فایل پشتیبان خالی یا غیرقابل خواندن است.');
         $backup = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        unset($raw);
         $backupVersion = (int)($backup['version'] ?? 0);
-        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, 4, MIRRORHUB_BACKUP_VERSION], true)) {
+        if (($backup['format'] ?? '') !== 'mirrorhub-backup' || !in_array($backupVersion, [1, 2, 3, 4, 5, MIRRORHUB_BACKUP_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه فایل پشتیبان با MirrorHub سازگار نیست.');
         }
         if (!isset($backup['tables']) || !is_array($backup['tables'])) throw new RuntimeException('بخش tables در فایل پشتیبان وجود ندارد.');
         if ($backupVersion >= 5 && !isset($backup['files'])) throw new RuntimeException('فهرست فایل‌های آپلودی در پشتیبان نسخهٔ ۵ وجود ندارد.');
-        $restorableUploadFiles = backupValidateUploadFiles($backup['files'] ?? []);
+        if ($fileExtension === 'zip') {
+            if (($backup['file_storage'] ?? '') !== 'zip' || $backupVersion < 6) {
+                throw new RuntimeException('ساختار فایل ZIP پشتیبان با نسخهٔ فعلی سازگار نیست.');
+            }
+            $restorableUploadFiles = backupValidateZipUploadFiles($zipArchive, $backup['files'] ?? []);
+            $zipArchive->close();
+            $zipArchive = null;
+        } else {
+            if (($backup['file_storage'] ?? 'json') !== 'json') {
+                throw new RuntimeException('نوع ذخیره‌سازی فایل‌های پشتیبان با پسوند JSON مطابقت ندارد.');
+            }
+            $restorableUploadFiles = backupValidateUploadFiles($backup['files'] ?? []);
+        }
         $restoredUploadCount = 0;
 
         $legacyMissingTables = [];
@@ -660,6 +685,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['backup_action'] ?? '') ===
             flash('success', 'داده‌های پشتیبان با حفظ اطلاعات فعلی اضافه شد. فایل‌های آپلودی بازیابی‌شده: ' . $restoredUploadCount . ' عدد.');
         }
     } catch (Throwable $e) {
+        if ($zipArchive instanceof ZipArchive) {
+            $zipArchive->close();
+            $zipArchive = null;
+        }
         if ($pdo->inTransaction()) {
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
             $pdo->rollBack();
