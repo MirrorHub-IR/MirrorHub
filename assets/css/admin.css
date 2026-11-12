@@ -921,3 +921,21 @@
     .admin-layout .section-header > .btn { width: 100%; justify-content: center; }
     .admin-layout .admin-topbar-title strong { max-width: 42vw; }
 }
+
+/* Backup export actions and focused upload states */
+.admin-layout .backup-download-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.admin-layout .backup-download-actions .btn { min-width: 130px; justify-content: center; }
+.admin-layout .backup-download-actions .form-hint { flex: 1 1 100%; }
+.admin-layout .import-zone { min-height: 138px; }
+.admin-layout .import-zone.is-dragging, .admin-layout .import-zone.dragover,
+.admin-layout .mh-upload-zone.is-dragging {
+    outline: 2px dashed var(--admin-accent);
+    outline-offset: 3px;
+    border-color: var(--admin-accent);
+    background: rgba(169,217,108,.09);
+}
+@media (max-width: 620px) {
+    .admin-layout .backup-download-actions { display: grid; grid-template-columns: minmax(0,1fr); }
+    .admin-layout .backup-download-actions .btn { width: 100%; }
+    .admin-layout .import-zone { min-height: 118px; padding: 14px; }
+}
