@@ -66,7 +66,7 @@ $assert(str_contains($donateAdmin, 'verifyCsrfToken') && str_contains($donateAdm
 $assert(str_contains($donateAdmin, 'donateSaveSettings'), 'Donate settings must be persisted.');
 $assert(str_contains($donatePage, 'htmlspecialchars') && str_contains($donatePage, 'rel="noopener noreferrer"'), 'Public contact links must be escaped and opened safely.');
 $assert(str_contains($layout, '/admin/donate.php') && str_contains($layout, '/donate.php'), 'Donate links must be present in admin and public navigation.');
-$assert(str_contains($backup, 'donate_settings') && str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 5'), 'Donate settings must be included in backups.');
+$assert(str_contains($backup, 'donate_settings') && str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 6'), 'Donate settings must be included in the current v6 backup format.');
 
 $assert(str_contains($htaccess, '.mirrorhub-installed'), 'Apache must deny direct reads of the installation lock.');
 $assert(str_contains($config, 'MIRRORHUB_DB_PORT'), 'Database port must be configurable through the environment.');
