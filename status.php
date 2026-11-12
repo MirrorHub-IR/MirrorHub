@@ -4,8 +4,47 @@ require_once 'includes/functions.php';
 require_once 'includes/layout.php';
 require_once 'includes/monitoring.php';
 
+ensureCategoryBaseUrlSchema($pdo);
+
+/* Provider filter: only provider categories with a valid HTTP(S) Base URL are selectable. */
+$providerOptions = [];
+try {
+    $providerOptions = $pdo->query("SELECT id, name, base_url FROM categories
+        WHERE type = 'provider' AND base_url IS NOT NULL AND base_url <> ''
+        ORDER BY sort_order ASC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $providerOptions = array_values(array_filter($providerOptions, static function ($provider): bool {
+        return categoryBaseUrlIsValid((string)($provider['base_url'] ?? ''));
+    }));
+} catch (Throwable $e) {
+    $providerOptions = [];
+}
+$selectedProviderId = filter_var($_GET['provider_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+$selectedProvider = null;
+if ($selectedProviderId !== false && $selectedProviderId !== null) {
+    foreach ($providerOptions as $providerOption) {
+        if ((int)$providerOption['id'] === (int)$selectedProviderId) {
+            $selectedProvider = $providerOption;
+            break;
+        }
+    }
+}
+if (!$selectedProvider) $selectedProviderId = 0;
+
 $summary = monitorStatusSummary($pdo);
 $rows = monitorMirrorRows($pdo);
+if ($selectedProvider) {
+    $providerMirrorIds = [];
+    $providerMirrorQuery = $pdo->prepare("SELECT mirror_id FROM mirror_categories WHERE category_id = ?");
+    $providerMirrorQuery->execute([(int)$selectedProvider['id']]);
+    foreach ($providerMirrorQuery->fetchAll(PDO::FETCH_COLUMN) as $providerMirrorId) {
+        $providerMirrorIds[(int)$providerMirrorId] = true;
+    }
+    $rows = array_values(array_filter($rows, static function ($row) use ($providerMirrorIds, $selectedProvider): bool {
+        return isset($providerMirrorIds[(int)$row['id']])
+            && providerUrlMatchesBaseUrl((string)$row['url'], (string)$selectedProvider['base_url']);
+    }));
+}
+$providerFilteredTotal = count($rows);
 $incidents = monitorRecentIncidents($pdo, 10);
 $mirrorLimit = 40;
 $rows = array_slice($rows, 0, $mirrorLimit);
@@ -98,10 +137,40 @@ renderHeader('وضعیت سرورها');
     </div>
 </section>
 
-<section class="section">
-    <h2 class="section-title">جزئیات میرورها</h2>
+<section class="section mon-status-results">
+    <div class="mon-status-filter-panel">
+        <form method="get" action="<?= SITE_URL ?>/status.php" class="mon-status-filter">
+            <div class="mon-status-filter-copy">
+                <strong>پالایش بر اساس ارائه‌دهنده</strong>
+                <small>فقط دسته‌های «ارائه‌دهنده» با Base URL معتبر HTTP/HTTPS در این فهرست هستند. میرورها باید به همان دسته متصل باشند و URL آن‌ها با scheme، میزبان، پورت و مسیر پایه مطابقت داشته باشد.</small>
+            </div>
+            <label for="status-provider-filter">ارائه‌دهنده</label>
+            <select id="status-provider-filter" name="provider_id">
+                <option value="0">همهٔ ارائه‌دهندگان</option>
+                <?php foreach ($providerOptions as $providerOption): ?>
+                    <option value="<?= (int)$providerOption['id'] ?>" <?= (int)$selectedProviderId === (int)$providerOption['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($providerOption['name'], ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn btn-primary">اعمال فیلتر</button>
+            <?php if ($selectedProvider): ?><a class="btn btn-outline" href="<?= SITE_URL ?>/status.php">پاک‌کردن فیلتر</a><?php endif; ?>
+        </form>
+        <?php if (!$providerOptions): ?>
+            <p class="mon-status-filter-help">هنوز دستهٔ ارائه‌دهنده‌ای با Base URL معتبر ثبت نشده است؛ برای فعال‌شدن پالایش، در پنل مدیریت ← دسته‌بندی‌ها، برای یک دستهٔ ارائه‌دهنده نشانی پایهٔ HTTP یا HTTPS ثبت کنید.</p>
+        <?php elseif ($selectedProvider): ?>
+            <p class="mon-status-filter-help">فیلتر فعال: <strong><?= htmlspecialchars($selectedProvider['name'], ENT_QUOTES, 'UTF-8') ?></strong> — <?= monitorFa($providerFilteredTotal) ?> میرور منطبق با Base URL</p>
+        <?php else: ?>
+            <p class="mon-status-filter-help">فهرست وضعیت شامل <?= monitorFa($providerFilteredTotal) ?> میرور HTTP/HTTPS متصل به دسته‌های ارائه‌دهنده است؛ در هر صفحه حداکثر <?= monitorFa($mirrorLimit) ?> مورد نمایش داده می‌شود.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="section-header">
+        <h2 class="section-title">جزئیات میرورها</h2>
+        <span class="badge badge-default"><?= monitorFa(min($providerFilteredTotal, $mirrorLimit)) ?> از <?= monitorFa($providerFilteredTotal) ?> مورد</span>
+    </div>
     <?php if (empty($rows)): ?>
-        <p class="empty-state">هنوز میروری برای پایش ثبت نشده است.</p>
+        <p class="empty-state"><?= $selectedProvider ? 'برای این ارائه‌دهنده، میرور فعال HTTP/HTTPS منطبق با Base URL پیدا نشد.' : 'هنوز میروری برای پایش ثبت نشده است.' ?></p>
     <?php else: ?>
         <div class="table-container mon-table-wrap">
             <table class="data-table mon-table">
