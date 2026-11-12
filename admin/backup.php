@@ -8,7 +8,7 @@ ensureCategoryBaseUrlSchema($pdo);
 require_once __DIR__ . '/../includes/donate.php';
 ensureDonateSchema($pdo);
 
-const MIRRORHUB_BACKUP_VERSION = 5;
+const MIRRORHUB_BACKUP_VERSION = 6;
 $backupTables = [
     'users', 'categories', 'mirrors', 'mirror_categories', 'requests', 'request_links',
     'visits', 'mirror_protocols', 'request_protocols', 'cms_articles',
@@ -87,9 +87,11 @@ function backupNormalizeUploadPath(string $path): string {
             throw new RuntimeException('مسیر فایل آپلودی در پشتیبان نامعتبر است.');
         }
     }
+    $basename = strtolower((string)basename($path));
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    if (in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
-        throw new RuntimeException('بازیابی فایل اجرایی از مسیر آپلود مجاز نیست.');
+    if (in_array($basename, ['.htaccess', '.user.ini', 'web.config'], true)
+        || in_array($extension, ['php','phtml','phar','cgi','pl','py','sh','bash','htaccess','html','htm','js','mjs','shtml'], true)) {
+        throw new RuntimeException('بازیابی فایل اجرایی یا پیکربندی سرور از مسیر آپلود مجاز نیست.');
     }
     return implode('/', $parts);
 }
@@ -175,6 +177,45 @@ function backupValidateUploadFiles($entries): array {
         if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
             $safeSvg = function_exists('sanitizeCategorySvg') ? sanitizeCategorySvg($content) : false;
             if ($safeSvg === false) throw new RuntimeException('فایل SVG در پشتیبان ناامن یا نامعتبر است.');
+            $content = $safeSvg;
+        }
+        $decoded[$path] = $content;
+    }
+    return $decoded;
+}
+
+/** Validate the ZIP manifest and read only the explicitly listed uploads entries. No archive path is ever extracted directly. */
+function backupValidateZipUploadFiles(ZipArchive $zip, $entries): array {
+    if (!is_array($entries)) throw new RuntimeException('فهرست فایل‌های ZIP نامعتبر است.');
+    if (count($entries) > 1000) throw new RuntimeException('تعداد فایل‌های ZIP بیش از حد مجاز است.');
+    $decoded = [];
+    $totalBytes = 0;
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) throw new RuntimeException('ساختار یکی از فایل‌های ZIP نامعتبر است.');
+        $path = backupNormalizeUploadPath((string)($entry['path'] ?? ''));
+        if (array_key_exists($path, $decoded)) throw new RuntimeException('مسیر تکراری در فایل ZIP وجود دارد.');
+        $expectedSize = filter_var($entry['size'] ?? null, FILTER_VALIDATE_INT);
+        if ($expectedSize === false || $expectedSize < 0 || $expectedSize > 10 * 1024 * 1024) {
+            throw new RuntimeException('اندازهٔ اعلام‌شدهٔ فایل ZIP نامعتبر است.');
+        }
+        $totalBytes += $expectedSize;
+        if ($totalBytes > 64 * 1024 * 1024) throw new RuntimeException('حجم مجموع فایل‌های ZIP بیش از ۶۴ مگابایت است.');
+        $archiveName = 'uploads/' . $path;
+        $stat = $zip->statName($archiveName);
+        if (!is_array($stat) || (int)($stat['size'] ?? -1) !== $expectedSize) {
+            throw new RuntimeException('یکی از فایل‌های ZIP وجود ندارد یا اندازهٔ آن با manifest مطابقت ندارد.');
+        }
+        $content = $zip->getFromName($archiveName);
+        if ($content === false || strlen($content) !== $expectedSize) {
+            throw new RuntimeException('خواندن یکی از فایل‌های ZIP ناموفق بود.');
+        }
+        $sha256 = strtolower((string)($entry['sha256'] ?? ''));
+        if (!preg_match('/^[a-f0-9]{64}$/', $sha256) || !hash_equals($sha256, hash('sha256', $content))) {
+            throw new RuntimeException('امضای SHA-256 یکی از فایل‌های ZIP درست نیست.');
+        }
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            $safeSvg = function_exists('sanitizeCategorySvg') ? sanitizeCategorySvg($content) : false;
+            if ($safeSvg === false) throw new RuntimeException('فایل SVG در ZIP ناامن یا نامعتبر است.');
             $content = $safeSvg;
         }
         $decoded[$path] = $content;
