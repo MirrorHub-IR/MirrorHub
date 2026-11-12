@@ -1017,3 +1017,23 @@
     .admin-layout .mirror-category-grid { grid-template-columns: minmax(0, 1fr); }
     .admin-layout .mirror-editor-side { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Provider + scheme filter fields on admin monitoring */
+.mon-filter-bar > .mon-filter-field {
+    display: grid;
+    flex: 0 1 220px;
+    gap: 5px;
+    min-width: min(100%, 180px);
+    margin-left: 0;
+}
+.mon-filter-bar > .mon-filter-field select {
+    width: 100%;
+    min-width: 0;
+}
+@media (max-width: 620px) {
+    .mon-filter-bar > .mon-filter-field {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 100%;
+    }
+}
