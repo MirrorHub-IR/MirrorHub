@@ -144,15 +144,17 @@ renderHeader('وضعیت سرورها');
                 <strong>پالایش بر اساس ارائه‌دهنده</strong>
                 <small>فقط دسته‌های «ارائه‌دهنده» با Base URL معتبر HTTP/HTTPS در این فهرست هستند. میرورها باید به همان دسته متصل باشند و URL آن‌ها با scheme، میزبان، پورت و مسیر پایه مطابقت داشته باشد.</small>
             </div>
-            <label for="status-provider-filter">ارائه‌دهنده</label>
-            <select id="status-provider-filter" name="provider_id">
-                <option value="0">همهٔ ارائه‌دهندگان</option>
-                <?php foreach ($providerOptions as $providerOption): ?>
-                    <option value="<?= (int)$providerOption['id'] ?>" <?= (int)$selectedProviderId === (int)$providerOption['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($providerOption['name'], ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+            <div class="mon-status-filter-field">
+                <label for="status-provider-filter">ارائه‌دهنده</label>
+                <select id="status-provider-filter" name="provider_id">
+                    <option value="0">همهٔ ارائه‌دهندگان</option>
+                    <?php foreach ($providerOptions as $providerOption): ?>
+                        <option value="<?= (int)$providerOption['id'] ?>" <?= (int)$selectedProviderId === (int)$providerOption['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($providerOption['name'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <button type="submit" class="btn btn-primary">اعمال فیلتر</button>
             <?php if ($selectedProvider): ?><a class="btn btn-outline" href="<?= SITE_URL ?>/status.php">پاک‌کردن فیلتر</a><?php endif; ?>
         </form>
