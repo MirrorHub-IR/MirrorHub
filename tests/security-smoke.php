@@ -91,11 +91,15 @@ $contributePage = file_get_contents($root . '/contribute.php') ?: '';
 $assert(str_contains($categoryFunctions, 'function sanitizeCategorySvg'), 'Safe SVG sanitizer is missing.');
 $assert(str_contains($categoryFunctions, 'function ensureCategoryBaseUrlSchema'), 'Category base URL migration helper is missing.');
 $assert(str_contains($categoryFunctions, 'function categoryBaseUrlIsValid'), 'Category base URL validation helper is missing.');
+$assert(str_contains($categoryFunctions, 'function providerUrlMatchesBaseUrl'), 'Provider URL/base URL matching helper is missing.');
 $assert(str_contains($categoryFunctions, 'getimagesize'), 'Uploaded raster category icons must be checked as actual images.');
 $assert(str_contains($categoryAdmin, 'image/svg+xml') && str_contains($categoryAdmin, 'name="base_url"'), 'Category editor must accept SVG icons and expose a base URL.');
 $assert(str_contains($categoryAdmin, 'delete-category-icon-form'), 'Category icon removal form must be separate from the edit form.');
 $assert(!str_contains($categoryAdmin, '<form action="<?= SITE_URL ?>/admin/categories.php?id=<?= $id ?>" method="POST" style="display: inline-block;'), 'Category editor must not contain nested forms.');
 $assert(str_contains($categoryPublic, "\$category['base_url']"), 'Public category page must display the configured base URL.');
+$assert(str_contains($categoryPublic, 'providerUrlMatchesBaseUrl') && str_contains($categoryPublic, "['type'] ?? '') === 'provider'"), 'Provider-only category pages must filter HTTP(S) mirror URLs by provider Base URL.');
+$assert(str_contains($cmsAdmin, "type IN ('software','provider')"), 'Guides must be attachable to both software and provider categories.');
+$assert(str_contains($categoryPage, "WHERE category_id = ? AND status = 'published'"), 'Every category page must show its published guides.');
 $assert(str_contains($categoryFunctions, "'code-2' =>"), 'Development SVG icon must exist in the icon registry.');
 $assert(str_contains($contributePage, "icon('code-2', 24)"), 'Project development contribution card must display its icon.');
 $assert(str_contains($ignore, '/config.local.php'), 'Local config must be git-ignored.');
@@ -104,7 +108,7 @@ $assert(str_contains($htaccess, 'config\.local\.php'), 'Apache must deny direct 
 foreach (['request_links', 'mirror_checks', 'mirror_status', 'mirror_daily_stats', 'mirror_incidents', 'monitor_settings', 'mirror_repository_health'] as $table) {
     $assert(str_contains($backup, "'" . $table . "'"), 'Backup coverage missing table: ' . $table);
 }
-$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 5'), 'Backup format version must match the Donate settings migration.');
+$assert(str_contains($backup, 'MIRRORHUB_BACKUP_VERSION = 6'), 'Backup format version must include JSON/ZIP file handling.');
 $assert(str_contains($backup, 'legacyMissingTables'), 'Legacy backup safety guard is missing.');
 $assert(str_contains($monitoring, 'mirror_repository_health'), 'Repository-health schema is missing.');
 $assert(str_contains($repoHealth, 'function monitorEvaluateRepositoryHealth'), 'Repository-health evaluator is missing.');
@@ -132,6 +136,10 @@ $assert(str_contains($apiDocs, '۸ تلاش') && str_contains($apiExample, 'API_
 
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/cms.php';
+$assert(providerUrlMatchesBaseUrl('https://mirror.example.invalid/ubuntu/dists/stable', 'https://mirror.example.invalid/ubuntu'), 'Provider Base URL must match the same HTTPS host and path subtree.');
+$assert(!providerUrlMatchesBaseUrl('https://mirror.example.invalid/ubuntu-extra', 'https://mirror.example.invalid/ubuntu'), 'Provider Base URL path matching must enforce a path boundary.');
+$assert(!providerUrlMatchesBaseUrl('http://mirror.example.invalid/ubuntu', 'https://mirror.example.invalid/ubuntu'), 'Provider Base URL filtering must not mix HTTP and HTTPS.');
+$assert(!providerUrlMatchesBaseUrl('rsync://mirror.example.invalid/ubuntu', 'https://mirror.example.invalid/ubuntu'), 'Provider Base URL filtering must reject non-HTTP(S) schemes.');
 require_once $root . '/includes/monitoring.php';
 require_once $root . '/includes/donate.php';
 $assert(monitorUrlScheme('https://mirror.example/repo') === 'https', 'Monitor URL scheme must detect HTTPS from the URL.');
@@ -205,6 +213,7 @@ $assert(str_contains($htaccess, 'RewriteRule ^mirrors/?$ mirrors.php') && str_co
 $assert(str_contains($htaccess, 'RewriteRule ^providers/?$ providers.php') && str_contains($htaccess, 'RewriteRule ^contribute/?$ contribute.php'), 'Clean provider or contribution route is missing.');
 $assert(str_contains($mirrorsDirectory, 'COUNT(*)') && str_contains($mirrorsDirectory, 'LIMIT {$perPage} OFFSET {$offset}'), 'Mirror directory must count and paginate results.');
 $assert(str_contains($mirrorsDirectory, 'category_id') && str_contains($mirrorsDirectory, 'protocol') && str_contains($mirrorsDirectory, 'mirror_status'), 'Mirror directory filters are incomplete.');
+$assert(str_contains($mirrorsDirectory, 'provider_id') && str_contains($mirrorsDirectory, "type = 'provider'") && str_contains($mirrorsDirectory, "LOWER(SUBSTRING_INDEX(m.url, '://', 1))"), 'Provider directory filtering must be provider-only and constrained by HTTP/HTTPS Base URL.');
 $assert(str_contains($softwareDirectory, "c.type='software'") && str_contains($providerDirectory, "c.type='provider'"), 'Software categories and providers must have separate pages.');
 $assert(str_contains($contributePage, '/suggest.php') && str_contains($contributePage, 'github.com/MirrorHub-IR/MirrorHub'), 'Contribution page must link to the submission form and source repository.');
 $assert(str_contains($homePage, 'home-explore-grid') && str_contains($homePage, 'home-search'), 'Homepage discovery layout is missing.');
@@ -212,13 +221,18 @@ $assert(str_contains($siteJs, "event.key === 'Escape'") && str_contains($siteJs,
 $assert(str_contains($sitemap, "baseUrl . '/mirrors/'") && str_contains($sitemap, "baseUrl . '/providers/'"), 'Sitemap must include the new directory landing pages.');
 $assert(str_contains($backupAdmin, 'backupCollectUploadFiles') && str_contains($backupAdmin, "'files' => \$uploadArchive"), 'Backup export must include the uploads manifest.');
 $assert(str_contains($backupAdmin, 'backupValidateUploadFiles') && str_contains($backupAdmin, 'backupRestoreUploadFiles'), 'Backup import must validate and restore uploaded files.');
+$assert(str_contains($backupAdmin, 'ZipArchive') && str_contains($backupAdmin, 'backupValidateZipUploadFiles') && str_contains($backupAdmin, "'file_storage' => \$exportFormat"), 'ZIP backup export and secure ZIP restore support are missing.');
+$assert(str_contains($backupAdmin, '100 * 1024 * 1024') && str_contains($backupAdmin, "['json', 'zip']"), 'Backup upload must accept JSON/ZIP up to the documented 100 MB limit.');
 $assert(str_contains($backupAdmin, 'backupNormalizeUploadPath') && str_contains($backupAdmin, 'content_base64') && str_contains($backupAdmin, 'sha256'), 'Uploaded-file archives must validate safe relative paths and integrity hashes.');
-$assert(str_contains($siteJs, "document.addEventListener('paste'") && str_contains($siteJs, 'DataTransfer') && str_contains($siteJs, 'is-dragging'), 'Global upload areas must support clipboard paste, drag/drop and selected-file updates.');
+$assert(str_contains($siteJs, "document.addEventListener('paste'") && str_contains($siteJs, 'clipboardData.items') && str_contains($siteJs, 'DataTransfer') && str_contains($siteJs, 'is-dragging'), 'Global upload areas must support clipboard files/items, drag/drop and selected-file updates.');
+$assert(str_contains($appJs, "['json', 'zip']") && str_contains($appJs, '100 * 1024 * 1024'), 'Backup import UI must accept ZIP and JSON up to 100 MB.');
 $assert(str_contains($monitorAdmin, 'name="scheme"') && str_contains($monitorAdmin, 'mon-card-grid') && str_contains($monitorAdmin, 'monitorUrlScheme'), 'Admin monitor page must provide URL-scheme filtering and responsive cards.');
 $assert(str_contains($monitoring, "LOWER(TRIM(m.url)) LIKE 'http://%' OR LOWER(TRIM(m.url)) LIKE 'https://%'") && str_contains($monitoring, 'function monitorUrlScheme'), 'Monitoring cycle and summaries must only include HTTP/HTTPS URLs.');
 $assert(str_contains($adminStyles, '.admin-sidebar { overflow-x: hidden; }') && str_contains($adminStyles, '.admin-nav { overflow-x: hidden;'), 'Admin sidebar must not expose horizontal overflow.');
 $assert(str_contains($adminHelp, 'Base URL') && str_contains($adminHelp, 'Ctrl+V') && str_contains($adminHelp, 'SVG'), 'In-panel admin guide must explain category base URLs, SVG and file paste.');
-$assert(str_contains($adminGuide, 'Base URL') && str_contains($adminGuide, 'uploads/') && str_contains($adminGuide, 'HTTPS'), 'Persian admin guide must document the new category, monitor and backup behavior.');
+$assert(str_contains($adminGuide, 'Base URL') && str_contains($adminGuide, 'uploads/') && str_contains($adminGuide, 'HTTPS') && str_contains($adminGuide, 'ZIP') && str_contains($adminGuide, 'پینگ'), 'Persian admin guide must document provider filtering, ping and JSON/ZIP backups.');
+$assert(str_contains($adminStyles, 'MirrorHub admin responsive hardening') && str_contains($adminStyles, '@media (max-width: 620px)'), 'Admin screens must include global responsive hardening.');
+$assert(str_contains($functions, 'providerUrlMatchesBaseUrl') && str_contains($layout, "'mirror.php', 'mirrors.php'"), 'Ping and provider URL matching must be wired into public routes.');
 
 if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
     $cmsTestPdo = new PDO('sqlite::memory:');
