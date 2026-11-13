@@ -1,0 +1,55 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version for the initial release"
+        required: true
+        default: "0.1.0"
+      target_ref:
+        description: "Branch or commit to tag (normally main)"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  draft-release:
+    name: Create a draft GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release target
+        uses: actions/checkout@v4
+        with:
+          ref: "${{ inputs.target_ref }}"
+          fetch-depth: 0
+
+      - name: Validate version and target
+        env:
+          RELEASE_VERSION: "${{ inputs.version }}"
+          TARGET_REF: "${{ inputs.target_ref }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_VERSION" != "0.1.0" ]]; then
+            echo "This prepared release workflow currently supports v0.1.0 only."
+            exit 1
+          fi
+          git rev-parse --verify "$TARGET_REF^0" >/dev/null
+          TAG_NAME="v$RELEASE_VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+      - name: Create draft release and tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ inputs.version }}"
+          target_commitish: "${{ inputs.target_ref }}"
+          name: "MirrorHub v${{ inputs.version }} — Initial Public Preview"
+          body_path: docs/releases/v0.1.0.md
+          draft: true
+          prerelease: false
