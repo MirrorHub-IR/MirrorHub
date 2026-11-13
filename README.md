@@ -6,7 +6,7 @@
 A self-hosted mirror directory with provider monitoring, repository metadata checks, a public API, and a Markdown knowledge base.</p>
 <p align="center">
   <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/quality.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/quality.yml/badge.svg?branch=main" alt="Quality Checks"></a>
-  <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/codeql.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/codeql.yml/badge.svg?branch=main" alt="CodeQL"></a>
+  <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/semgrep.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/semgrep.yml/badge.svg?branch=main" alt="Semgrep Security"></a>
   <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white" alt="PHP 8.2+">
   <a href="https://github.com/MirrorHub-IR/MirrorHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MirrorHub-IR/MirrorHub" alt="License"></a>
   <a href="https://github.com/MirrorHub-IR/MirrorHub/stargazers"><img src="https://img.shields.io/github/stars/MirrorHub-IR/MirrorHub?style=flat" alt="GitHub stars"></a>
@@ -237,7 +237,7 @@ find assets/js -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do
 done
 ~~~
 
-The GitHub Actions quality workflow runs PHP lint, the security/regression smoke suite, and JavaScript syntax checks. The CodeQL workflow performs static analysis for PHP. Dependabot checks GitHub Actions dependencies weekly. These workflows do not currently provision a live MySQL/MariaDB integration database or execute browser-based end-to-end tests.
+The GitHub Actions quality workflow runs PHP lint, the security/regression smoke suite, and JavaScript syntax checks. The Semgrep workflow scans the repository with community security rules and uploads SARIF findings to GitHub code scanning where supported. Dependabot checks GitHub Actions dependencies weekly. These workflows do not currently provision a live MySQL/MariaDB integration database or execute browser-based end-to-end tests.
 
 ### GitHub contribution workflow
 

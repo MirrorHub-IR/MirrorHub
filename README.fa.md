@@ -6,7 +6,7 @@
 یک سامانهٔ خودمیزبان برای فهرست میرورها، پایش ارائه‌دهندگان، بررسی تازگی Metadata، API عمومی و مستندات Markdown.</p>
 <p align="center">
   <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/quality.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/quality.yml/badge.svg?branch=main" alt="Quality Checks"></a>
-  <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/codeql.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/codeql.yml/badge.svg?branch=main" alt="CodeQL"></a>
+  <a href="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/semgrep.yml"><img src="https://github.com/MirrorHub-IR/MirrorHub/actions/workflows/semgrep.yml/badge.svg?branch=main" alt="Semgrep Security"></a>
   <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white" alt="PHP 8.2+">
   <a href="https://github.com/MirrorHub-IR/MirrorHub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MirrorHub-IR/MirrorHub" alt="License"></a>
   <a href="https://github.com/MirrorHub-IR/MirrorHub/stargazers"><img src="https://img.shields.io/github/stars/MirrorHub-IR/MirrorHub?style=flat" alt="GitHub stars"></a>
@@ -237,7 +237,7 @@ find assets/js -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do
 done
 ~~~
 
-گردش‌کار Quality در GitHub، PHP lint، تست دود امنیتی/رگرسیون و بررسی Syntax جاوااسکریپت را اجرا می‌کند. گردش‌کار CodeQL تحلیل ایستا برای PHP انجام می‌دهد. Dependabot وابستگی‌های GitHub Actions را هفتگی بررسی می‌کند. این گردش‌کارها فعلاً دیتابیس زنده MySQL/MariaDB برای تست یکپارچه یا تست End-to-End مرورگر ایجاد نمی‌کنند.
+گردش‌کار Quality در GitHub، PHP lint، تست دود امنیتی/رگرسیون و بررسی Syntax جاوااسکریپت را اجرا می‌کند. گردش‌کار Semgrep با قواعد امنیتی جامعه، کد را اسکن می‌کند و در صورت پشتیبانی، یافته‌ها را با قالب SARIF به GitHub Code Scanning می‌فرستد. Dependabot وابستگی‌های GitHub Actions را هفتگی بررسی می‌کند. این گردش‌کارها فعلاً دیتابیس زنده MySQL/MariaDB برای تست یکپارچه یا تست End-to-End مرورگر ایجاد نمی‌کنند.
 
 ### فرایند مشارکت در GitHub
 

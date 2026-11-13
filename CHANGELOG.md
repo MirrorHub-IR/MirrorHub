@@ -6,7 +6,7 @@ Notable changes are recorded here. Entries describe repository changes; a tagged
 
 ### Added
 - Expanded English and Persian project documentation, including a full English installation guide and bilingual first-release notes.
-- CodeQL static-analysis workflow for PHP.
+- Semgrep static-analysis workflow for PHP.
 - Weekly Dependabot updates for GitHub Actions.
 - Pull request template, issue contact configuration, community code of conduct, and support policy.
 - Manual draft-release workflow for preparing the initial v0.1.0 GitHub Release.
