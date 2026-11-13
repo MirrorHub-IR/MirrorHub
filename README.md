@@ -22,7 +22,7 @@ MirrorHub is an open-source, self-hosted PHP and MySQL/MariaDB application for d
 
 The application is designed to run on a conventional PHP web host. It does not currently require Composer or an npm build pipeline.
 
-> **Project maturity:** MirrorHub is under active development and is currently pre-1.0. The repository has automated quality checks, security smoke tests, and a CodeQL workflow. Automated checks are not a substitute for staging, database integration, browser, backup-restore, and production security testing. The initial release notes are in [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md); they do not imply that a GitHub Release has already been published.
+> **Project maturity:** MirrorHub is under active development and is currently pre-1.0. The repository has automated quality checks, security smoke tests, and a Semgrep security-scanning workflow. Automated checks are not a substitute for staging, database integration, browser, backup-restore, and production security testing. The initial release notes are in [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md); they do not imply that a GitHub Release has already been published.
 
 ## Features
 
