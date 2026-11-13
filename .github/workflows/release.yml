@@ -13,12 +13,55 @@ on:
         default: "main"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  verify:
+    name: Verify source before tagging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release target
+        uses: actions/checkout@v4
+        with:
+          ref: "${{ inputs.target_ref }}"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, pdo_mysql, pdo_sqlite, fileinfo, curl
+          coverage: none
+
+      - name: Lint PHP files
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            php -l "$file"
+          done < <(find . -type f -name '*.php' -not -path './.git/*' -print0)
+
+      - name: Run security and regression smoke tests
+        run: php tests/security-smoke.php
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check JavaScript files
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find assets/js -type f -name '*.js' -print0)
+
   draft-release:
     name: Create a draft GitHub Release
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out release target
         uses: actions/checkout@v4
