@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out release target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: "${{ inputs.target_ref }}"
 
@@ -64,7 +64,7 @@ jobs:
       contents: write
     steps:
       - name: Check out release target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: "${{ inputs.target_ref }}"
           fetch-depth: 0
